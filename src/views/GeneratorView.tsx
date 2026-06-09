@@ -135,7 +135,7 @@ export const GeneratorView: React.FC = () => {
           <div className="space-y-2">
             <div className="flex justify-between text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
               <span><Clock size={10} className="inline mb-0.5" /> Max Budget</span>
-              <span className="text-purple-400 font-bold">${maxPrice.toFixed(0)}</span>
+              <span className="text-purple-400 font-bold">₦{maxPrice.toFixed(0)}</span>
             </div>
             <input
               type="range"

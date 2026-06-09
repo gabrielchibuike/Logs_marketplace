@@ -1,26 +1,31 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockProducts } from '../data/products';
-import type { Product, Transaction } from '../data/products';
+import type { Product } from '../data/products';
 import { supabase, isSupabaseConfigured } from '../utils/supabase';
+import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
+
+export interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 interface AppContextType {
-  walletBalance: number;
   cart: string[];
   purchases: string[];
-  transactions: Transaction[];
   products: Product[];
   loading: boolean;
   dbError: string | null;
   user: any | null;
   userProfile: { role: string; email: string } | null;
+  authModalOpen: boolean;
+  setAuthModalOpen: (open: boolean) => void;
+  toasts: Toast[];
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   addToCart: (id: string) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
-  checkout: () => Promise<{ success: boolean; error?: string }>;
-  deposit: (amount: number, method: string) => Promise<void>;
+  completePayment: (productId: string, reference: string) => Promise<{ success: boolean; error?: string }>;
   hasPurchased: (id: string) => boolean;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
   signUp: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
@@ -28,90 +33,92 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // --- OFFLINE STATE FALLBACKS ---
-  const [walletBalance, setWalletBalance] = useState<number>(() => {
-    const saved = localStorage.getItem('paidlogstore_balance');
-    return saved !== null ? parseFloat(saved) : 500.00;
-  });
+// --- Custom Toast Component ---
+const ToastContainer: React.FC<{ toasts: Toast[]; onClose: (id: string) => void }> = ({ toasts, onClose }) => {
+  return (
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+      {toasts.map((toast) => {
+        const typeStyles = {
+          success: 'border-emerald-500/30 text-emerald-400 bg-emerald-950/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]',
+          error: 'border-rose-500/30 text-rose-400 bg-rose-950/40 shadow-[0_0_15px_rgba(244,63,94,0.15)]',
+          info: 'border-cyan-500/30 text-cyan-400 bg-cyan-950/40 shadow-[0_0_15px_rgba(6,182,212,0.15)]',
+        };
 
+        const icons = {
+          success: <CheckCircle className="w-5 h-5 shrink-0" />,
+          error: <AlertCircle className="w-5 h-5 shrink-0" />,
+          info: <Info className="w-5 h-5 shrink-0" />,
+        };
+
+        return (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto flex items-start justify-between gap-3 p-4 rounded-xl border backdrop-blur-md transition-all duration-300 transform translate-y-0 animate-slide-in font-mono text-xs ${typeStyles[toast.type]}`}
+          >
+            <div className="flex gap-2.5 items-start">
+              {icons[toast.type]}
+              <span className="leading-relaxed font-semibold">{toast.message}</span>
+            </div>
+            <button
+              onClick={() => onClose(toast.id)}
+              className="text-slate-500 hover:text-slate-200 transition cursor-pointer p-0.5 rounded-lg hover:bg-slate-900/40"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<string[]>(() => {
     const saved = localStorage.getItem('paidlogstore_cart');
     return saved !== null ? JSON.parse(saved) : [];
   });
 
-  const [purchases, setPurchases] = useState<string[]>(() => {
-    const saved = localStorage.getItem('paidlogstore_purchases');
-    return saved !== null ? JSON.parse(saved) : [];
-  });
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('paidlogstore_transactions');
-    return saved !== null ? JSON.parse(saved) : [
-      {
-        id: 'tx-init',
-        type: 'deposit',
-        amount: 500.00,
-        description: 'Welcome bonus credits added',
-        timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-      }
-    ];
-  });
-
-  // --- NEW LIVE DATABASE DRIVEN STATES ---
-  const [products, setProducts] = useState<Product[]>(() => {
-    return isSupabaseConfigured() ? [] : mockProducts;
-  });
+  const [purchases, setPurchases] = useState<string[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [dbError, setDbError] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [userProfile, setUserProfile] = useState<{ role: string; email: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    const saved = localStorage.getItem('paidlogstore_active_tab');
-    return saved !== null ? saved : 'catalog';
-  });
 
-  // Keep local storage synced for offline safety
-  useEffect(() => {
-    localStorage.setItem('paidlogstore_active_tab', activeTab);
-  }, [activeTab]);
+  // Global Auth Modal state & Custom Toasts
+  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      localStorage.setItem('paidlogstore_balance', walletBalance.toString());
-    }
-  }, [walletBalance]);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  };
 
   useEffect(() => {
     localStorage.setItem('paidlogstore_cart', JSON.stringify(cart));
   }, [cart]);
 
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      localStorage.setItem('paidlogstore_purchases', JSON.stringify(purchases));
-    }
-  }, [purchases]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      localStorage.setItem('paidlogstore_transactions', JSON.stringify(transactions));
-    }
-  }, [transactions]);
-
 
   // --- LIVE SUPABASE LOGIC SYNC ---
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured()) {
+      setDbError('Supabase environment variables are missing.');
+      return;
+    }
 
     setLoading(true);
 
-    // 1. Fetch live products from PostgreSQL
+    // 1. Fetch live products from PostgreSQL (excluding sensitive credentials column)
     const fetchLiveProducts = async () => {
       try {
         setDbError(null);
         const { data, error } = await supabase
           .from('products')
-          .select('*')
+          .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -133,7 +140,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             niche: item.niche || '',
             tags: Array.isArray(item.tags) ? item.tags : [],
             sampleData: item.sample_data || '',
-            fullDataContent: item.encrypted_credentials || ''
+            fullDataContent: '' // Protected credentials column not loaded on catalog fetch
           }));
           setProducts(formatted);
         }
@@ -162,10 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         setUser(null);
         setUserProfile(null);
-        // Reset to initial offline defaults
-        setWalletBalance(500.00);
         setPurchases([]);
-        setTransactions([]);
       }
     });
 
@@ -174,13 +178,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Fetch / Sync profile balance, purchased items, and transaction logs
+  // Fetch / Sync profile purchases and details
   const syncUserProfile = async (userId: string, email: string) => {
     try {
-      // A. Fetch profile role and wallet balance
+      // A. Fetch profile role
       const { data: profile, error: profileErr } = await supabase
         .from('profiles')
-        .select('role, wallet_balance')
+        .select('role')
         .eq('id', userId)
         .single();
 
@@ -191,7 +195,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: profile.role,
           email: email
         });
-        setWalletBalance(parseFloat(profile.wallet_balance));
       }
 
       // B. Fetch purchased accounts mapping
@@ -203,25 +206,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (bought) {
         setPurchases(bought.map((b: any) => b.product_id));
       }
-
-      // C. Fetch transaction logs
-      const { data: txs, error: txsErr } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (txsErr) throw txsErr;
-      if (txs) {
-        const formattedTxs: Transaction[] = txs.map((t: any) => ({
-          id: t.id,
-          type: t.type as 'deposit' | 'purchase',
-          amount: parseFloat(t.amount),
-          description: t.payment_reference || `${t.type === 'deposit' ? 'Deposited' : 'Purchased'} credits`,
-          timestamp: t.created_at
-        }));
-        setTransactions(formattedTxs);
-      }
     } catch (err) {
       console.error('Error syncing profile meta:', err);
     }
@@ -231,111 +215,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addToCart = (id: string) => {
     if (!cart.includes(id) && !purchases.includes(id)) {
       setCart((prev) => [...prev, id]);
+      showToast('Account added to shopping cart.', 'info');
     }
   };
 
   const removeFromCart = (id: string) => {
     setCart((prev) => prev.filter((item) => item !== id));
+    showToast('Account removed from cart.', 'info');
   };
 
   const clearCart = () => {
     setCart([]);
   };
 
-  const checkout = async () => {
-    const activeProducts = products.filter((p) => cart.includes(p.id));
-    const totalCost = activeProducts.reduce((sum, item) => sum + item.price, 0);
-
-    if (totalCost === 0) {
-      return { success: false, error: 'Cart is empty' };
+  const completePayment = async (productId: string, reference: string) => {
+    if (!user) {
+      showToast('You must be signed in to complete purchase.', 'error');
+      return { success: false, error: 'Authentication required' };
     }
 
-    if (walletBalance < totalCost) {
-      return { success: false, error: 'Insufficient funds — deposit more credits in the Wallet Center' };
-    }
+    try {
+      setLoading(true);
+      const { error } = await supabase.rpc('complete_checkout', {
+        product_id_param: productId,
+        reference_param: reference
+      });
 
-    if (isSupabaseConfigured() && user) {
-      try {
-        setLoading(true);
-        // Call postgres stored RPC function in database to deduct and log everything atomically
-        for (const prod of activeProducts) {
-          const { error } = await supabase.rpc('checkout_product', {
-            product_id_param: prod.id
-          });
-          if (error) throw error;
-        }
-
-        // Refresh live data
-        await syncUserProfile(user.id, user.email || '');
-        setCart([]);
-        return { success: true };
-      } catch (err: any) {
-        console.error('Live checkout error:', err);
-        return { success: false, error: err.message || 'Database checkout transaction failed' };
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error('Failed to verify checkout on database:', error);
+        throw error;
       }
-    } else {
-      // Offline fallback checkout
-      setWalletBalance((prev) => prev - totalCost);
-      setPurchases((prev) => [...prev, ...cart]);
-      
-      const newTx: Transaction = {
-        id: `tx-${Math.random().toString(36).substring(2, 9)}`,
-        type: 'purchase',
-        amount: totalCost,
-        description: `Purchased ${activeProducts.length} account(s): ${activeProducts.map((i) => i.title).join(', ')}`,
-        timestamp: new Date().toISOString(),
-      };
-      
-      setTransactions((prev) => [newTx, ...prev]);
-      setCart([]);
+
+      // Sync updated purchases mapping
+      await syncUserProfile(user.id, user.email || '');
+
+      // Remove product from cart if it was inside
+      setCart((prev) => prev.filter((id) => id !== productId));
+
+      showToast('Payment verified! Digital asset credentials unlocked.', 'success');
       return { success: true };
-    }
-  };
-
-  const deposit = async (amount: number, method: string) => {
-    if (isSupabaseConfigured() && user) {
-      try {
-        setLoading(true);
-        // 1. Insert transaction log
-        const { error: txErr } = await supabase
-          .from('transactions')
-          .insert({
-            user_id: user.id,
-            type: 'deposit',
-            amount: amount,
-            status: 'completed',
-            payment_method: method.toLowerCase().includes('crypto') ? 'crypto' : 'card',
-            payment_reference: `Deposited credits via ${method}`
-          });
-        if (txErr) throw txErr;
-
-        // 2. Add profile wallet balance
-        const { error: profileErr } = await supabase
-          .from('profiles')
-          .update({ wallet_balance: walletBalance + amount })
-          .eq('id', user.id);
-        if (profileErr) throw profileErr;
-
-        // Refresh session profile sync
-        await syncUserProfile(user.id, user.email || '');
-      } catch (err) {
-        console.error('Error depositing to database:', err);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // Offline fallback deposit
-      setWalletBalance((prev) => prev + amount);
-      const newTx: Transaction = {
-        id: `tx-${Math.random().toString(36).substring(2, 9)}`,
-        type: 'deposit',
-        amount,
-        description: `Deposited credits via ${method}`,
-        timestamp: new Date().toISOString(),
-      };
-      setTransactions((prev) => [newTx, ...prev]);
+    } catch (err: any) {
+      console.error('Database checkout error:', err);
+      showToast(err.message || 'Failed to verify transaction on database ledger.', 'error');
+      return { success: false, error: err.message || 'Database checkout transaction failed' };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -355,14 +279,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         password: pass,
         options: {
           data: {
-            role: 'buyer',
-            wallet_balance: 500.00
+            role: 'buyer'
           }
         }
       });
       if (error) throw error;
+      showToast('Account created successfully! Verify your email to sign in.', 'success');
       return { success: true };
     } catch (err: any) {
+      showToast(err.message || 'Failed to register account.', 'error');
       return { success: false, error: err.message };
     }
   };
@@ -377,8 +302,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         password: pass
       });
       if (error) throw error;
+      showToast('Successfully authenticated session.', 'success');
       return { success: true };
     } catch (err: any) {
+      showToast(err.message || 'Invalid email or password.', 'error');
       return { success: false, error: err.message };
     }
   };
@@ -386,33 +313,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const signOut = async () => {
     if (!isSupabaseConfigured()) return;
     await supabase.auth.signOut();
+    showToast('Signed out of session.', 'info');
+    // navigate('/');
   };
 
 
   return (
     <AppContext.Provider value={{
-      walletBalance,
       cart,
       purchases,
-      transactions,
       products,
       loading,
       dbError,
       user,
       userProfile,
+      authModalOpen,
+      setAuthModalOpen,
+      toasts,
+      showToast,
       addToCart,
       removeFromCart,
       clearCart,
-      checkout,
-      deposit,
+      completePayment,
       hasPurchased,
-      activeTab,
-      setActiveTab,
       signUp,
       signIn,
       signOut
     }}>
       {children}
+      <ToastContainer toasts={toasts} onClose={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
     </AppContext.Provider>
   );
 };

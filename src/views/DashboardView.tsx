@@ -1,21 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Product } from '../data/products';
 import { LogTerminal } from '../components/LogTerminal';
-import { LayoutDashboard, Wallet, Users, Clock, Eye, Search, Key, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck } from 'lucide-react';
+import { supabase } from '../utils/supabase';
+import { useNavigate } from 'react-router-dom';
 
 export const DashboardView: React.FC = () => {
-  const { purchases, walletBalance, transactions, setActiveTab, products } = useApp();
+  const { purchases, products, user, setAuthModalOpen } = useApp();
+  const navigate = useNavigate();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [disputedIds, setDisputedIds] = useState<string[]>([]);
+  
+  // Dynamic states
+  const [credentials, setCredentials] = useState<string>('');
+  const [loadingCreds, setLoadingCreds] = useState<boolean>(false);
+  const [txList, setTxList] = useState<any[]>([]);
+  const [loadingTxs, setLoadingTxs] = useState<boolean>(false);
 
-  const handleRaiseDispute = (productId: string) => {
-    if (window.confirm("⚠️ Are you sure you want to raise a dispute for this account?\n\nThis will instantly freeze the transaction on the database and flag the credentials for admin security auditing. Our support team will contact you shortly.")) {
-      setDisputedIds(prev => [...prev, productId]);
-      alert("🚨 Dispute Registered successfully!\n\nDatabase status updated to: DISPUTED.\nAdmin security audit ticket #LOG-" + Math.floor(1000 + Math.random()*9000) + " has been logged. We will reach out to your profile address within 2 hours.");
-    }
-  };
+  if (!user) {
+    return (
+      <div className="w-full py-20 flex flex-col items-center justify-center text-center">
+        <div className="bg-slate-950/45 p-10 rounded-3xl border border-slate-900 glass max-w-md w-full">
+          <ShieldCheck size={48} className="text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-100 font-mono mb-2 uppercase tracking-wide">Authentication Required</h2>
+          <p className="text-sm text-slate-400 mb-6">You need to sign in to view your purchased accounts, transaction history, and secure credentials.</p>
+          <button
+            onClick={() => setAuthModalOpen(true)}
+            className="w-full py-3 bg-cyan-950/30 border border-cyan-500/50 hover:bg-cyan-900/50 hover:border-cyan-400 text-cyan-400 transition font-mono font-bold rounded-xl cursor-pointer"
+          >
+            Sign In to Access Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const purchasedProducts = purchases
     .map((id) => products.find((p) => p.id === id))
@@ -25,12 +45,67 @@ export const DashboardView: React.FC = () => {
   const totalFollowers = purchasedProducts.reduce((sum, p) => sum + p.followers, 0);
 
   // Auto-select first purchased product
-  if (!selectedProduct && purchasedProducts.length > 0) {
-    setSelectedProduct(purchasedProducts[0]);
-  }
+  useEffect(() => {
+    if (!selectedProduct && purchasedProducts.length > 0) {
+      setSelectedProduct(purchasedProducts[0]);
+    }
+  }, [purchasedProducts, selectedProduct]);
 
-  const filteredLedger = transactions.filter((tx) =>
-    tx.description.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
+  // Fetch selected product credentials
+  useEffect(() => {
+    if (selectedProduct && user) {
+      const fetchCreds = async () => {
+        setLoadingCreds(true);
+        try {
+          const { data, error } = await supabase.rpc('get_purchased_asset_data', {
+            product_id_param: selectedProduct.id
+          });
+          if (error) throw error;
+          setCredentials(data || 'No access credentials returned.');
+        } catch (err: any) {
+          console.error('Error fetching dashboard credentials:', err);
+          setCredentials('Error loading access credentials: ' + err.message);
+        } finally {
+          setLoadingCreds(false);
+        }
+      };
+      fetchCreds();
+    } else {
+      setCredentials('');
+    }
+  }, [selectedProduct, user]);
+
+  // Fetch transaction history
+  useEffect(() => {
+    if (user) {
+      const fetchTransactions = async () => {
+        setLoadingTxs(true);
+        try {
+          const { data, error } = await supabase
+            .from('transactions')
+            .select('id, type, amount, payment_reference, created_at')
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          setTxList(data || []);
+        } catch (err) {
+          console.error('Error loading transactions:', err);
+        } finally {
+          setLoadingTxs(false);
+        }
+      };
+      fetchTransactions();
+    }
+  }, [purchases, user]);
+
+  const handleRaiseDispute = (productId: string) => {
+    if (window.confirm("⚠️ Are you sure you want to raise a dispute for this account?\n\nThis will instantly freeze the transaction on the database and flag the credentials for admin security auditing. Our support team will contact you shortly.")) {
+      setDisputedIds(prev => [...prev, productId]);
+      alert("🚨 Dispute Registered successfully!\n\nDatabase status updated to: DISPUTED.\nAdmin security audit ticket #LOG-" + Math.floor(1000 + Math.random()*9000) + " has been logged. We will reach out to your profile address within 2 hours.");
+    }
+  };
+
+  const filteredLedger = txList.filter((tx) =>
+    (tx.payment_reference || '').toLowerCase().includes(ledgerSearch.toLowerCase()) ||
     tx.type.toLowerCase().includes(ledgerSearch.toLowerCase())
   );
 
@@ -62,7 +137,7 @@ export const DashboardView: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => setActiveTab('catalog')}
+          onClick={() => navigate('/')}
           className="py-2 px-4 bg-slate-900 border border-slate-800 hover:border-cyan-500/30 text-slate-300 hover:text-cyan-400 transition text-xs font-bold rounded-lg font-mono cursor-pointer"
         >
           Browse Marketplace
@@ -70,7 +145,7 @@ export const DashboardView: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-900 glass flex items-center justify-between">
           <div className="text-left">
             <span className="text-[10px] text-slate-500 font-mono block">ACCOUNTS OWNED</span>
@@ -83,17 +158,7 @@ export const DashboardView: React.FC = () => {
 
         <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-900 glass flex items-center justify-between">
           <div className="text-left">
-            <span className="text-[10px] text-slate-500 font-mono block">WALLET CREDITS</span>
-            <span className="text-xl font-bold text-purple-300 font-mono">${walletBalance.toFixed(2)}</span>
-          </div>
-          <div className="p-3 bg-purple-950/30 border border-purple-500/20 text-purple-400 rounded-lg">
-            <Wallet size={18} />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-900 glass flex items-center justify-between">
-          <div className="text-left">
-            <span className="text-[10px] text-slate-500 font-mono block">TOTAL FOLLOWERS</span>
+            <span className="text-[10px] text-slate-500 font-mono block">TOTAL REACH (FOLLOWERS)</span>
             <span className="text-xl font-bold text-slate-200 font-mono">{formatFollowers(totalFollowers)}</span>
           </div>
           <div className="p-3 bg-purple-950/30 border border-purple-500/20 text-purple-400 rounded-lg">
@@ -149,64 +214,71 @@ export const DashboardView: React.FC = () => {
           )}
         </div>
 
-      {/* Credentials Viewer */}
-      <div className="lg:col-span-2 flex flex-col justify-between h-full min-h-[400px]">
-        {selectedProduct ? (
-          <div className="flex flex-col h-full justify-between">
-            <LogTerminal
-              title={`${selectedProduct.id}_credentials.txt`}
-              content={selectedProduct.fullDataContent}
-              maxHeight="max-h-[420px]"
-            />
-            
-            {/* Buyer Protection Control Panel */}
-            <div className="mt-3 p-4 rounded-xl bg-slate-950 border border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
-              <div className="flex items-start gap-2.5">
-                <div className={`p-2 rounded-lg border ${
-                  disputedIds.includes(selectedProduct.id) 
-                    ? 'bg-rose-950/20 border-rose-500/30 text-rose-400' 
-                    : 'bg-cyan-950/20 border-cyan-500/30 text-cyan-400'
-                }`}>
-                  <ShieldCheck size={16} className="animate-pulse" />
+        {/* Credentials Viewer */}
+        <div className="lg:col-span-2 flex flex-col justify-between h-full min-h-[400px]">
+          {selectedProduct ? (
+            <div className="flex flex-col h-full justify-between">
+              {loadingCreds ? (
+                <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-slate-800 rounded-2xl bg-slate-950/40 text-center gap-2 text-xs font-mono text-cyan-400">
+                  <div className="w-5 h-5 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin"></div>
+                  <span>Decrypting secure digital assets...</span>
                 </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 font-mono block">EXCLUSIVITY GUARANTEE</span>
-                  <span className={`text-xs font-semibold block ${disputedIds.includes(selectedProduct.id) ? 'text-rose-400' : 'text-slate-200'}`}>
-                    {disputedIds.includes(selectedProduct.id) 
-                      ? '🚨 TRANSACTION DISPUTED (Admin Alerted)' 
-                      : '🛡️ 72-Hour Buyer Protection: Active'}
-                  </span>
-                  <span className="text-[9px] text-slate-500 font-mono block mt-0.5">
-                    {disputedIds.includes(selectedProduct.id) 
-                      ? 'Funds frozen. Auditing seller credential logs.' 
-                      : 'Expires in: 71h 59m'}
-                  </span>
-                </div>
-              </div>
-              {!disputedIds.includes(selectedProduct.id) && (
-                <button
-                  onClick={() => handleRaiseDispute(selectedProduct.id)}
-                  className="px-3 py-1.5 rounded-lg border border-rose-500/30 hover:border-rose-500 text-rose-400 hover:bg-rose-500/10 text-[10px] font-mono font-semibold transition cursor-pointer shrink-0"
-                >
-                  Raise Dispute
-                </button>
+              ) : (
+                <LogTerminal
+                  title={`${selectedProduct.id}_credentials.txt`}
+                  content={credentials}
+                  maxHeight="max-h-[420px]"
+                />
               )}
+              
+              {/* Buyer Protection Control Panel */}
+              <div className="mt-3 p-4 rounded-xl bg-slate-950 border border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                <div className="flex items-start gap-2.5">
+                  <div className={`p-2 rounded-lg border ${
+                    disputedIds.includes(selectedProduct.id) 
+                      ? 'bg-rose-950/20 border-rose-500/30 text-rose-400' 
+                      : 'bg-cyan-950/20 border-cyan-500/30 text-cyan-400'
+                  }`}>
+                    <ShieldCheck size={16} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-mono block">EXCLUSIVITY GUARANTEE</span>
+                    <span className={`text-xs font-semibold block ${disputedIds.includes(selectedProduct.id) ? 'text-rose-400' : 'text-slate-200'}`}>
+                      {disputedIds.includes(selectedProduct.id) 
+                        ? '🚨 TRANSACTION DISPUTED (Admin Alerted)' 
+                        : '🛡️ 72-Hour Buyer Protection: Active'}
+                    </span>
+                    <span className="text-[9px] text-slate-500 font-mono block mt-0.5">
+                      {disputedIds.includes(selectedProduct.id) 
+                        ? 'Funds frozen. Auditing seller credential logs.' 
+                        : 'Expires in: 71h 59m'}
+                    </span>
+                  </div>
+                </div>
+                {!disputedIds.includes(selectedProduct.id) && (
+                  <button
+                    onClick={() => handleRaiseDispute(selectedProduct.id)}
+                    className="px-3 py-1.5 rounded-lg border border-rose-500/30 hover:border-rose-500 text-rose-400 hover:bg-rose-500/10 text-[10px] font-mono font-semibold transition cursor-pointer shrink-0"
+                  >
+                    Raise Dispute
+                  </button>
+                )}
+              </div>
+              
+              <p className="text-[10px] text-slate-500 font-mono text-left mt-2.5">
+                ⚠ Keep credentials secure. Change passwords and recovery emails immediately after transfer.
+              </p>
             </div>
-            
-            <p className="text-[10px] text-slate-500 font-mono text-left mt-2.5">
-              ⚠ Keep credentials secure. Change passwords and recovery emails immediately after transfer.
-            </p>
-          </div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl bg-slate-950/20 py-20 text-center glass">
-            <Key size={48} className="text-slate-700 mb-3 animate-pulse-slow" />
-            <h3 className="text-sm font-semibold text-slate-400">No Account Selected</h3>
-            <p className="text-xs text-slate-600 max-w-xs mt-1">
-              Select a purchased account from the left panel to view full credentials.
-            </p>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl bg-slate-950/20 py-20 text-center glass">
+              <Key size={48} className="text-slate-700 mb-3 animate-pulse-slow" />
+              <h3 className="text-sm font-semibold text-slate-400">No Account Selected</h3>
+              <p className="text-xs text-slate-600 max-w-xs mt-1">
+                Select a purchased account from the left panel to view full credentials.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Transaction Ledger */}
@@ -227,7 +299,11 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        {filteredLedger.length === 0 ? (
+        {loadingTxs ? (
+          <div className="py-8 text-center text-xs text-slate-500 font-mono">
+            Loading transaction ledger...
+          </div>
+        ) : filteredLedger.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-600 font-mono">
             No transactions found.
           </div>
@@ -245,15 +321,13 @@ export const DashboardView: React.FC = () => {
               <tbody>
                 {filteredLedger.map((tx) => (
                   <tr key={tx.id} className="border-b border-slate-900 hover:bg-slate-950/30 transition">
-                    <td className="py-3 px-3 text-slate-500">
-                      {new Date(tx.timestamp).toLocaleString()}
+                    <td className="py-3 px-3 text-slate-500 text-left">
+                      {new Date(tx.created_at).toLocaleString()}
                     </td>
-                    <td className="py-3 px-3 text-slate-400 font-semibold">{tx.id}</td>
-                    <td className="py-3 px-3 text-slate-300">{tx.description}</td>
-                    <td className={`py-3 px-3 text-right font-bold ${
-                      tx.type === 'deposit' ? 'text-emerald-400' : 'text-rose-400'
-                    }`}>
-                      {tx.type === 'deposit' ? '+' : '-'}${tx.amount.toFixed(2)}
+                    <td className="py-3 px-3 text-slate-400 font-semibold text-left">{tx.id}</td>
+                    <td className="py-3 px-3 text-slate-300 text-left">{tx.payment_reference || 'Purchase receipt'}</td>
+                    <td className="py-3 px-3 text-right font-bold text-rose-400">
+                      -₦{parseFloat(tx.amount).toLocaleString()}
                     </td>
                   </tr>
                 ))}

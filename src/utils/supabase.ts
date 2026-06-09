@@ -1,26 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mock.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'mock-anon-key';
+const isProd = import.meta.env.PROD;
 
-const isMissingEnv = !import.meta.env.VITE_SUPABASE_URL || (!import.meta.env.VITE_SUPABASE_ANON_KEY && !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 
+const missingVars: string[] = [];
+if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
+if (!supabasePublishableKey) missingVars.push('VITE_SUPABASE_PUBLISHABLE_KEY');
+if (!paystackKey) missingVars.push('VITE_PAYSTACK_PUBLIC_KEY');
 
-
-if (isMissingEnv) {
-  console.warn(
-    '⚠️ PaidLogStore: Supabase environment variables are missing! ' +
-    'The application is falling back to mock mode. To connect to your database: \n' +
-    '  1. Create a `.env` file at the root of the project.\n' +
-    '  2. Copy and configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from `.env.example`.'
-  );
+if (missingVars.length > 0) {
+  const errorMsg = `🚨 PRODUCTION ERROR: Missing critical environment variables: ${missingVars.join(', ')}. Ensure they are configured in your environment or .env file.`;
+  console.error(errorMsg);
+  if (isProd) {
+    throw new Error(errorMsg);
+  }
 }
 
-// Export initialized client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Export initialized client (with fallback only for dev environment if env is not loaded yet)
+export const supabase = createClient(supabaseUrl || 'https://mock.supabase.co', supabasePublishableKey || 'mock-publishable-key');
 
 // Utility to check if Supabase is connected to actual credentials
-export const isSupabaseConfigured = () => !isMissingEnv;
-
-console.log(!isMissingEnv, "checking....");
-
+export const isSupabaseConfigured = () => missingVars.length === 0;

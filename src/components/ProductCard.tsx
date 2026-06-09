@@ -1,12 +1,15 @@
 import React from 'react';
 import type { Product } from '../data/products';
 import { useApp } from '../context/AppContext';
-import { Shield, ShoppingCart, Eye, Check, Users, Heart } from 'lucide-react';
+import { Shield, Eye, Check, Users, Heart, CreditCard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface ProductCardProps {
   product: Product;
   onOpenDetails: (product: Product) => void;
 }
+
+declare const PaystackPop: any;
 
 const formatFollowers = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
@@ -34,10 +37,10 @@ const getPlatformColor = (platform: string) => {
 };
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails }) => {
-  const { cart, purchases, addToCart, setActiveTab } = useApp();
+  const { purchases, user, setAuthModalOpen, completePayment, showToast } = useApp();
+  const navigate = useNavigate();
 
   const isPurchased = purchases.includes(product.id);
-  const isInCart = cart.includes(product.id);
 
   const getCategoryBadge = (cat: string) => {
     switch (cat) {
@@ -53,6 +56,35 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
   const accountAge = product.accountAgeDays >= 365
     ? `${Math.floor(product.accountAgeDays / 365)}yr${product.accountAgeDays >= 730 ? 's' : ''}`
     : `${Math.floor(product.accountAgeDays / 30)}mo`;
+
+  const handlePaystackCheckout = () => {
+    if (!user) {
+      setAuthModalOpen(true);
+      return;
+    }
+
+    try {
+      const handler = PaystackPop.setup({
+        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+        email: user.email,
+        amount: Math.round(product.price * 100), // in kobo
+        callback: (response: any) => {
+          completePayment(product.id, response.reference).then((res) => {
+            if (res.success) {
+              navigate('/dashboard');
+            }
+          });
+        },
+        onClose: () => {
+          showToast('Payment cancelled.', 'info');
+        }
+      });
+      handler.openIframe();
+    } catch (err: any) {
+      console.error('Paystack initialization error:', err);
+      showToast('Paystack gateway load failed.', 'error');
+    }
+  };
 
   return (
     <div className={`glass rounded-xl p-5 flex flex-col justify-between transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group ${isPurchased ? 'glow-purple' : 'glow-cyan'}`}>
@@ -76,36 +108,36 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
           </div>
         </div>
 
-        <h3 className="text-slate-100 font-semibold text-base mb-1.5 group-hover:text-cyan-300 transition duration-200">
+        <h3 className="text-slate-100 font-semibold text-base mb-1.5 group-hover:text-cyan-300 transition duration-200 text-left">
           {product.title}
         </h3>
-        
-        <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
+
+        <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed text-left">
           {product.description}
         </p>
 
         {/* Niche Tag */}
-        <div className="mb-4">
+        <div className="mb-4 text-left">
           <span className="text-[10px] text-slate-500 font-mono bg-slate-950/50 border border-slate-800 rounded px-2 py-0.5">
             {product.niche}
           </span>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-2 py-2.5 px-3 rounded-lg bg-slate-950/40 border border-slate-900/60 font-mono text-[10px] text-slate-400 mb-4">
-          <div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 py-2.5 px-3 rounded-lg bg-slate-950/40 border border-slate-900/60 font-mono text-[10px] text-slate-400 mb-4">
+          <div className="text-left">
             <span className="block text-slate-600"><Users size={10} className="inline mb-0.5" /> Followers</span>
             <span className="text-slate-200 font-medium">{formatFollowers(product.followers)}</span>
           </div>
-          <div>
+          <div className="text-left">
             <span className="block text-slate-600"><Heart size={10} className="inline mb-0.5" /> Engage</span>
             <span className="text-emerald-400 font-medium">{product.engagement}%</span>
           </div>
-          <div>
+          <div className="text-left">
             <span className="block text-slate-600">Posts</span>
             <span className="text-slate-200 font-medium">{product.posts.toLocaleString()}</span>
           </div>
-          <div>
+          <div className="text-left">
             <span className="block text-slate-600">Age</span>
             <span className="text-amber-400 font-medium">{accountAge}</span>
           </div>
@@ -117,7 +149,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
         <div className="flex flex-col text-left">
           <span className="text-[10px] text-slate-500 font-mono">Price</span>
           <span className="text-lg font-bold text-slate-200 font-mono">
-            ${product.price.toFixed(2)}
+            ₦{product.price.toLocaleString()}
           </span>
         </div>
 
@@ -132,24 +164,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
 
           {isPurchased ? (
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => navigate('/dashboard')}
               className="flex items-center gap-1.5 py-2 px-3 rounded-lg bg-purple-950/30 border border-purple-500/30 text-purple-400 hover:bg-purple-950/50 hover:text-purple-300 text-xs font-semibold transition duration-200 cursor-pointer"
             >
               <Check size={14} /> Owned
             </button>
-          ) : isInCart ? (
-            <button
-              disabled
-              className="flex items-center gap-1.5 py-2 px-3 rounded-lg bg-slate-900 border border-slate-800 text-cyan-500/50 text-xs font-semibold cursor-not-allowed"
-            >
-              In Cart
-            </button>
           ) : (
             <button
-              onClick={() => addToCart(product.id)}
+              onClick={handlePaystackCheckout}
               className="flex items-center gap-1.5 py-2 px-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition duration-200 shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] cursor-pointer"
             >
-              <ShoppingCart size={14} /> Add
+              <CreditCard size={14} /> Pay via Paystack
             </button>
           )}
         </div>

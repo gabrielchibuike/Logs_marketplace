@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     role TEXT DEFAULT 'buyer' CHECK (role IN ('admin', 'buyer')),
-    wallet_balance NUMERIC(10, 2) DEFAULT 500.00 CHECK (wallet_balance >= 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -51,8 +50,9 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     type TEXT NOT NULL CHECK (type IN ('deposit', 'purchase')),
     amount NUMERIC(10, 2) NOT NULL,
     status TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed')),
-    payment_method TEXT NOT NULL CHECK (payment_method IN ('crypto', 'card', 'wallet')),
+    payment_method TEXT NOT NULL CHECK (payment_method IN ('crypto', 'card', 'wallet', 'paystack')),
     payment_reference TEXT,
+    paystack_reference TEXT UNIQUE, -- UNIQUE Paystack reference column to prevent double-spending
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -81,12 +81,15 @@ ALTER TABLE public.purchased_accounts ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.profiles (id, email, role, wallet_balance)
+    INSERT INTO public.profiles (id, email, role)
     VALUES (
         new.id,
         new.email,
-        COALESCE(new.raw_user_meta_data->>'role', 'buyer'),
-        COALESCE((new.raw_user_meta_data->>'wallet_balance')::numeric, 500.00)
+        CASE 
+            WHEN new.raw_user_meta_data->>'role' IN ('admin', 'buyer') 
+            THEN new.raw_user_meta_data->>'role' 
+            ELSE 'buyer' 
+        END
     );
     RETURN NEW;
 END;
@@ -116,7 +119,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 -- ========================================================
--- ROW LEVEL SECURITY (RLS) POLICIES
+-- ROW LEVEL SECURITY (RLS) POLICIES & PRIVILEGES
 -- ========================================================
 
 -- A. PROFILES POLICIES
@@ -125,7 +128,7 @@ CREATE POLICY "Users can view their own profile"
 ON public.profiles FOR SELECT 
 USING (auth.uid() = id);
 
--- 2. Users can update their own profile (e.g. for wallet updates, though typically handled via functions)
+-- 2. Users can update their own profile
 CREATE POLICY "Users can update their own profile" 
 ON public.profiles FOR UPDATE 
 USING (auth.uid() = id);
@@ -145,6 +148,9 @@ USING (status = 'active');
 CREATE POLICY "Admins can do everything on products" 
 ON public.products FOR ALL 
 USING (public.is_admin(auth.uid()));
+
+-- Restrict SELECT operations on the credentials column specifically from clients
+REVOKE SELECT (encrypted_credentials) ON public.products FROM public, anon, authenticated;
 
 -- C. TRANSACTIONS POLICIES
 -- 1. Users can view their own transactions
@@ -178,13 +184,12 @@ USING (public.is_admin(auth.uid()));
 -- HELPER STORED PROCEDURES (RPCs)
 -- ========================================================
 
--- Purchase Product RPC (Atomic checkout transaction)
-CREATE OR REPLACE FUNCTION public.checkout_product(product_id_param UUID)
+-- Atomic Checkout RPC (completes checkout using Paystack reference)
+CREATE OR REPLACE FUNCTION public.complete_checkout(product_id_param UUID, reference_param TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
     buyer_id_var UUID;
     product_price_var NUMERIC(10, 2);
-    buyer_balance_var NUMERIC(10, 2);
     transaction_id_var UUID;
 BEGIN
     -- 1. Secure calling user ID
@@ -193,7 +198,15 @@ BEGIN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
 
-    -- 2. Get and lock the product for update (ensure it is active)
+    -- 2. Verify Paystack reference hasn't been reused
+    IF EXISTS (
+        SELECT 1 FROM public.transactions 
+        WHERE paystack_reference = reference_param
+    ) THEN
+        RAISE EXCEPTION 'Transaction reference already processed';
+    END IF;
+
+    -- 3. Get and lock the product for update (ensure it is active)
     SELECT price INTO product_price_var 
     FROM public.products 
     WHERE id = product_id_param AND status = 'active'
@@ -203,36 +216,55 @@ BEGIN
         RAISE EXCEPTION 'Product not found or already sold';
     END IF;
 
-    -- 3. Get and lock buyer profile balance
-    SELECT wallet_balance INTO buyer_balance_var 
-    FROM public.profiles 
-    WHERE id = buyer_id_var
-    FOR UPDATE;
-
-    -- 4. Check if buyer has enough balance
-    IF buyer_balance_var < product_price_var THEN
-        RAISE EXCEPTION 'Insufficient wallet balance';
-    END IF;
-
-    -- 5. Deduct balance from buyer
-    UPDATE public.profiles 
-    SET wallet_balance = wallet_balance - product_price_var 
-    WHERE id = buyer_id_var;
-
-    -- 6. Update product status to sold
+    -- 4. Update product status to sold
     UPDATE public.products 
     SET status = 'sold' 
     WHERE id = product_id_param;
 
-    -- 7. Record transaction entry
-    INSERT INTO public.transactions (user_id, type, amount, status, payment_method, payment_reference)
-    VALUES (buyer_id_var, 'purchase', product_price_var, 'completed', 'wallet', 'purchase_' || product_id_param)
+    -- 5. Record transaction entry
+    INSERT INTO public.transactions (user_id, type, amount, status, payment_method, payment_reference, paystack_reference)
+    VALUES (buyer_id_var, 'purchase', product_price_var, 'completed', 'card', 'Purchase of account: ' || product_id_param, reference_param)
     RETURNING id INTO transaction_id_var;
 
-    -- 8. Map product to purchased accounts list
+    -- 6. Map product to purchased accounts list
     INSERT INTO public.purchased_accounts (buyer_id, product_id, transaction_id)
     VALUES (buyer_id_var, product_id_param, transaction_id_var);
 
     RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- Secure asset decryption/retrieval RPC
+CREATE OR REPLACE FUNCTION public.get_purchased_asset_data(product_id_param UUID)
+RETURNS TEXT AS $$
+DECLARE
+    buyer_id_var UUID;
+    credentials_var TEXT;
+BEGIN
+    -- 1. Secure calling user ID
+    buyer_id_var := auth.uid();
+    IF buyer_id_var IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    -- 2. Verify if the buyer actually purchased this product
+    IF NOT EXISTS (
+        SELECT 1 FROM public.purchased_accounts 
+        WHERE buyer_id = buyer_id_var AND product_id = product_id_param
+    ) THEN
+        RAISE EXCEPTION 'Access denied: You have not purchased this asset';
+    END IF;
+
+    -- 3. Retrieve the encrypted credentials (Security Definer runs as owner, bypassing column RLS/privilege limitations)
+    SELECT encrypted_credentials INTO credentials_var 
+    FROM public.products 
+    WHERE id = product_id_param;
+
+    RETURN credentials_var;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant EXECUTE privileges to all authenticated users
+GRANT EXECUTE ON FUNCTION public.complete_checkout(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_purchased_asset_data(UUID) TO authenticated;
