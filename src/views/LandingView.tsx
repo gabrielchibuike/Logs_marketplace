@@ -1,11 +1,10 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Key, TrendingUp, BadgeCheck, Users, Clock, ShoppingCart, Check, CreditCard, ChevronRight } from 'lucide-react';
-import type { Product } from '../data/products';
+import { Shield, Key, TrendingUp, BadgeCheck, ChevronRight } from 'lucide-react';
 
 export const LandingView: React.FC = () => {
-  const { products, purchases, cart, addToCart } = useApp();
+  const { products, purchases } = useApp();
   const navigate = useNavigate();
 
   // Take first 3 active products for preview
@@ -179,7 +178,6 @@ export const LandingView: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {featuredProducts.map((product) => {
-              const isInCart = cart.includes(product.id);
               return (
                 <div key={product.id} className="bg-brand-card border border-brand-border rounded-md p-5 flex flex-col justify-between hover:border-brand-navy/25 transition">
                   <div>

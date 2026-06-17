@@ -272,7 +272,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let errorMsg = '';
 
       try {
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
+        const { error } = await supabase.functions.invoke('verify-payment', {
           body: { productId, reference }
         });
         if (error) throw error;

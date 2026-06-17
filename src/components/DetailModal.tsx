@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Product } from '../data/products';
 import { useApp } from '../context/AppContext';
 import { LogTerminal } from './LogTerminal';
-import { X, Shield, ShoppingCart, Check, Sparkles, Users, Heart, Clock, FileText, CreditCard } from 'lucide-react';
+import { X, Shield, ShoppingCart, Check, Sparkles, Users, Clock, FileText, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 
