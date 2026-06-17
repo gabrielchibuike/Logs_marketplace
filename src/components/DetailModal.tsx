@@ -5,6 +5,7 @@ import { LogTerminal } from './LogTerminal';
 import { X, Shield, ShoppingCart, Check, Sparkles, Users, Clock, FileText, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { decryptText } from '../utils/crypto';
 
 interface DetailModalProps {
   product: Product;
@@ -59,7 +60,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
             product_id_param: product.id
           });
           if (error) throw error;
-          setDecryptedCredentials(data || 'No access credentials returned.');
+          const decrypted = data ? await decryptText(data) : 'No access credentials returned.';
+          setDecryptedCredentials(decrypted);
         } catch (err: any) {
           console.error('Error fetching credentials:', err);
           setDecryptedCredentials('Error loading access credentials: ' + err.message);

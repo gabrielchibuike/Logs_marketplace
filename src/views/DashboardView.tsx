@@ -5,6 +5,7 @@ import { LogTerminal } from '../components/LogTerminal';
 import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useNavigate } from 'react-router-dom';
+import { decryptText } from '../utils/crypto';
 
 export const DashboardView: React.FC = () => {
   const { purchases, products, user, setAuthModalOpen } = useApp();
@@ -61,7 +62,8 @@ export const DashboardView: React.FC = () => {
             product_id_param: selectedProduct.id
           });
           if (error) throw error;
-          setCredentials(data || 'No access credentials returned.');
+          const decrypted = data ? await decryptText(data) : 'No access credentials returned.';
+          setCredentials(decrypted);
         } catch (err: any) {
           console.error('Error fetching dashboard credentials:', err);
           setCredentials('Error loading access credentials: ' + err.message);

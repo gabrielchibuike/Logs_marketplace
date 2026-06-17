@@ -106,13 +106,13 @@ export const CatalogView: React.FC = () => {
             <ShieldCheck size={18} />
             <span>DATABASE INVENTORY EMPTY</span>
           </div>
-          <p className="text-xs text-brand-navy leading-relaxed font-sans">
+          {/* <p classNamze="text-xs text-brand-navy leading-relaxed font-sans">
             Supabase is successfully synced, but the products table contains zero rows.
           </p>
           <div className="text-xs text-brand-muted font-sans space-y-1">
             <p className="font-bold text-brand-navy">How to seed inventory:</p>
             <p>Execute the SQL commands in <a href="file:///home/gabby/Documents/Logs_marketplace/supabase/seed.sql" className="text-brand-red underline hover:text-brand-red-hover">supabase/seed.sql</a> inside your database SQL editor.</p>
-          </div>
+          </div> */}
         </div>
       )}
 
@@ -137,7 +137,7 @@ export const CatalogView: React.FC = () => {
               className={`px-3 py-1.5 rounded text-xs font-bold whitespace-nowrap transition cursor-pointer border ${selectedPlatform === plat
                 ? 'bg-brand-navy border-brand-navy text-brand-bg'
                 : 'bg-brand-bg border-brand-border text-brand-muted hover:text-brand-navy hover:bg-brand-navy/5'
-              }`}
+                }`}
             >
               {plat}
             </button>

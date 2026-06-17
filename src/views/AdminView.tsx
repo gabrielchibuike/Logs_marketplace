@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../utils/supabase';
+import { encryptText } from '../utils/crypto';
 import {
   ShieldAlert, ShieldCheck, Plus, Trash2, ToggleLeft, ToggleRight,
   Package, TrendingUp, Clock, Loader2, AlertTriangle, X
@@ -157,6 +158,7 @@ export const AdminView: React.FC = () => {
         }
       });
 
+      const encrypted = await encryptText(formCredentials);
       const { error } = await supabase.from('products').insert([{
         title: formTitle,
         description: formDescription,
@@ -172,7 +174,7 @@ export const AdminView: React.FC = () => {
         niche: formNiche,
         tags: parsedTags.length > 0 ? parsedTags : [],
         sample_data: sampleDataObj,
-        encrypted_credentials: formCredentials,
+        encrypted_credentials: encrypted,
 
         status: 'draft'
       }]);
