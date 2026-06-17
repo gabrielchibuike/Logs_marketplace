@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Database, Cpu, LayoutDashboard, ShoppingCart, Trash2, ShieldCheck, Menu, X, CreditCard, LogOut, User, Shield } from 'lucide-react';
+import { Home, Database, Cpu, LayoutDashboard, ShoppingCart, Trash2, ShieldCheck, Menu, X, CreditCard, LogOut, User, Shield, Sun, Moon } from 'lucide-react';
 import type { Product } from '../data/products';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 declare const PaystackPop: any;
 
 export const Navbar: React.FC = () => {
-  const { cart, removeFromCart, products, user, userProfile, signOut, setAuthModalOpen, completePayment, showToast } = useApp();
+  const { cart, removeFromCart, products, user, userProfile, signOut, setAuthModalOpen, completePayment, showToast, theme, toggleTheme } = useApp();
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -39,7 +39,7 @@ export const Navbar: React.FC = () => {
       });
       handler.openIframe();
     } catch (err: any) {
-      console.error('Paystack initialization error:', err);
+      console.error('Paystack gateway load error:', err);
       showToast('Paystack gateway load failed.', 'error');
     }
   };
@@ -54,24 +54,25 @@ export const Navbar: React.FC = () => {
   };
 
   const navLinks = [
-    { path: '/', label: 'Marketplace', icon: <Database size={16} /> },
-    { path: '/generator', label: 'Account Finder', icon: <Cpu size={16} /> },
-    { path: '/dashboard', label: 'My Accounts', icon: <LayoutDashboard size={16} /> },
-    ...(userProfile?.role === 'admin' ? [{ path: '/admin', label: 'Admin', icon: <Shield size={16} /> }] : []),
+    { path: '/', label: 'Home', icon: <Home size={15} /> },
+    { path: '/marketplace', label: 'Marketplace', icon: <Database size={15} /> },
+    { path: '/generator', label: 'Account Finder', icon: <Cpu size={15} /> },
+    { path: '/dashboard', label: 'My Accounts', icon: <LayoutDashboard size={15} /> },
+    ...(userProfile?.role === 'admin' ? [{ path: '/admin', label: 'Admin', icon: <Shield size={15} /> }] : []),
   ];
 
   return (
-    <nav className="glass-nav sticky top-0 z-50 w-full px-6 py-4 flex items-center justify-between">
+    <nav className="glass-nav sticky top-0 z-50 w-full px-6 py-3.5 flex items-center justify-between border-b border-brand-border">
       {/* Brand Logo */}
       <Link
         to="/"
         className="flex items-center gap-2 cursor-pointer select-none group"
       >
-        <div className="p-1.5 rounded-lg bg-cyan-950/50 border border-cyan-500/30 group-hover:border-cyan-400 group-hover:shadow-[0_0_10px_rgba(6,182,212,0.5)] transition duration-300">
-          <ShieldCheck className="text-cyan-400 w-5 h-5 group-hover:rotate-6 transition-transform" />
+        <div className="p-1.5 rounded bg-brand-navy/5 border border-brand-border text-brand-navy transition duration-300">
+          <ShieldCheck className="text-brand-red w-5 h-5 group-hover:rotate-3 transition-transform" />
         </div>
-        <span className="font-mono font-bold text-lg tracking-wider text-slate-100 uppercase">
-          Paid<span className="text-cyan-400">Log</span>Store
+        <span className="font-sans font-extrabold text-base tracking-wider text-brand-navy uppercase">
+          Paid<span className="text-brand-red">Log</span>Store
         </span>
       </Link>
 
@@ -81,9 +82,9 @@ export const Navbar: React.FC = () => {
           <Link
             key={link.path}
             to={link.path}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition duration-200 cursor-pointer ${location.pathname === link.path
-              ? 'bg-cyan-950/40 text-cyan-400 border border-cyan-500/20'
-              : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/50'
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded text-xs font-bold transition duration-150 cursor-pointer ${location.pathname === link.path
+              ? 'bg-brand-navy/5 text-brand-navy border border-brand-border/80'
+              : 'text-brand-muted hover:text-brand-navy hover:bg-brand-navy/5'
               }`}
           >
             {link.icon}
@@ -93,16 +94,16 @@ export const Navbar: React.FC = () => {
       </div>
 
       {/* Action Utilities */}
-      <div className="flex items-center gap-4 relative">
+      <div className="flex items-center gap-3 relative">
         {/* User Auth Badge */}
         {user ? (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 ">
-            <User size={13} className="text-cyan-400" />
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded border border-brand-border text-xs font-mono text-brand-navy bg-brand-card">
+            <User size={13} className="text-brand-red" />
             <span className="max-w-[120px] truncate">{user.email}</span>
             <button
               onClick={() => handleLogOut()}
               title="Sign Out"
-              className="ml-1 text-slate-500 hover:text-rose-400 transition cursor-pointer p-0.5"
+              className="ml-1 text-brand-muted hover:text-brand-red transition cursor-pointer p-0.5"
             >
               <LogOut size={12} />
             </button>
@@ -110,7 +111,7 @@ export const Navbar: React.FC = () => {
         ) : (
           <button
             onClick={() => setAuthModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-950/40 text-xs font-mono font-semibold transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-brand-navy/10 hover:border-brand-navy text-brand-navy hover:bg-brand-navy/5 text-xs font-sans font-bold transition duration-200 cursor-pointer bg-brand-card"
           >
             <User size={13} /> Sign In
           </button>
@@ -120,50 +121,50 @@ export const Navbar: React.FC = () => {
         <div className="relative">
           <button
             onClick={() => setCartOpen(!cartOpen)}
-            className={`p-2 rounded-lg border transition duration-300 relative cursor-pointer ${cart.length > 0
-              ? 'bg-cyan-950/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/40'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-100'
+            className={`p-2 rounded border transition duration-200 relative cursor-pointer ${cart.length > 0
+              ? 'bg-brand-red text-white border-brand-red hover:bg-brand-red-hover'
+              : 'bg-brand-card border-brand-border text-brand-navy hover:bg-brand-navy/5'
               }`}
           >
-            <ShoppingCart size={18} />
+            <ShoppingCart size={16} />
             {cart.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-lg animate-pulse">
+              <span className="absolute -top-1.5 -right-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-brand-navy text-[9px] font-bold text-white shadow-md">
                 {cart.length}
               </span>
             )}
           </button>
 
           {cartOpen && (
-            <div className="absolute right-0 mt-3 w-80 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-2xl z-50 glass">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-                <span className="text-sm font-semibold text-slate-200 font-mono">Shopping Cart</span>
-                <span className="text-xs text-slate-400 font-mono">{cart.length} item(s)</span>
+            <div className="absolute right-0 mt-3 w-80 rounded-md border border-brand-border bg-brand-card p-4 shadow-xl z-50 glass">
+              <div className="flex items-center justify-between border-b border-brand-border pb-2 mb-3">
+                <span className="text-xs font-bold text-brand-navy font-sans uppercase tracking-wider">Shopping Cart</span>
+                <span className="text-xs text-brand-muted font-mono">{cart.length} item(s)</span>
               </div>
 
               {cartItems.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                <div className="py-6 text-center text-xs text-brand-muted font-mono">
                   Your cart is empty.
                 </div>
               ) : (
                 <>
                   <div className="max-h-48 overflow-y-auto space-y-2 mb-3 scrollbar-thin">
                     {cartItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between gap-2 p-1.5 rounded bg-slate-900/60 border border-slate-800/50">
+                      <div key={item.id} className="flex items-center justify-between gap-2 p-2 rounded bg-brand-bg border border-brand-border">
                         <div className="overflow-hidden text-left">
-                          <p className="text-xs font-semibold text-slate-200 truncate">{item.title}</p>
-                          <p className="text-[10px] text-cyan-400 font-mono">₦{item.price.toLocaleString()}</p>
+                          <p className="text-xs font-bold text-brand-navy truncate">{item.title}</p>
+                          <p className="text-[10px] text-brand-red font-bold font-mono">₦{item.price.toLocaleString()}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handlePaystackCheckout(item)}
-                            className="text-cyan-400 hover:text-cyan-300 p-1 hover:bg-slate-800 rounded transition cursor-pointer"
+                            className="text-brand-navy hover:text-brand-red p-1 hover:bg-brand-navy/5 rounded transition cursor-pointer"
                             title="Pay via Paystack"
                           >
                             <CreditCard size={12} />
                           </button>
                           <button
                             onClick={() => removeFromCart(item.id)}
-                            className="text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-800 rounded transition cursor-pointer"
+                            className="text-brand-muted hover:text-brand-red p-1 hover:bg-brand-navy/5 rounded transition cursor-pointer"
                             title="Remove item"
                           >
                             <Trash2 size={12} />
@@ -173,9 +174,9 @@ export const Navbar: React.FC = () => {
                     ))}
                   </div>
 
-                  <div className="border-t border-slate-800 pt-3 text-center">
-                    <p className="text-[10px] text-slate-400 font-mono">
-                      Pay for items individually using the checkout buttons above.
+                  <div className="border-t border-brand-border pt-3 text-center">
+                    <p className="text-[10px] text-brand-muted font-mono leading-relaxed">
+                      Complete purchase individually using checkout icons above.
                     </p>
                   </div>
                 </>
@@ -184,25 +185,35 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="p-2 rounded border border-brand-border bg-brand-card text-brand-navy hover:bg-brand-navy/5 transition duration-200 cursor-pointer"
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+
         {/* Mobile Menu Toggle */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 md:hidden rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-slate-100 cursor-pointer"
+          className="p-2 md:hidden rounded border border-brand-border bg-brand-card text-brand-navy hover:bg-brand-navy/5 cursor-pointer"
         >
-          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          {mobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
         </button>
       </div>
 
       {mobileMenuOpen && (
-        <div className="absolute top-16 left-0 right-0 p-4 mx-4 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl md:hidden flex flex-col gap-2 z-50 glass">
+        <div className="absolute top-16 left-0 right-0 p-4 mx-4 rounded-md border border-brand-border bg-brand-card shadow-xl md:hidden flex flex-col gap-2.5 z-50 glass">
           {navLinks.map((link) => (
             <Link
               key={link.path}
               to={link.path}
               onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-sm font-medium transition cursor-pointer ${location.pathname === link.path
-                ? 'bg-cyan-950/40 text-cyan-400 border border-cyan-500/20'
-                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/50'
+              className={`flex items-center gap-3 px-4 py-2.5 rounded text-sm font-bold transition cursor-pointer ${location.pathname === link.path
+                ? 'bg-brand-navy/5 text-brand-navy border border-brand-border'
+                : 'text-brand-muted hover:text-brand-navy hover:bg-brand-navy/5'
                 }`}
             >
               {link.icon}
@@ -210,21 +221,24 @@ export const Navbar: React.FC = () => {
             </Link>
           ))}
           {user ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300">
-              <User size={13} className="text-cyan-400" />
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded border border-brand-border text-xs font-mono text-brand-navy bg-brand-bg mt-1">
+              <User size={13} className="text-brand-red" />
               <span className="max-w-[120px] truncate">{user.email}</span>
               <button
                 onClick={() => handleLogOut()}
                 title="Sign Out"
-                className="ml-1 text-slate-500 hover:text-rose-400 transition cursor-pointer p-0.5"
+                className="ml-1 text-brand-muted hover:text-brand-red transition cursor-pointer p-0.5"
               >
                 <LogOut size={12} />
               </button>
             </div>
           ) : (
             <button
-              onClick={() => setAuthModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-950/40 text-xs font-mono font-semibold transition cursor-pointer"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setAuthModalOpen(true);
+              }}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded border border-brand-navy/10 text-brand-navy hover:bg-brand-navy/5 text-xs font-sans font-bold transition cursor-pointer bg-brand-card mt-1"
             >
               <User size={13} /> Sign In
             </button>

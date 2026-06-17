@@ -38,39 +38,39 @@ export const CatalogView: React.FC = () => {
     });
 
   return (
-    <div className="w-full space-y-8 py-6">
+    <div className="w-full space-y-8 py-4">
       {/* Hero Header */}
       <div className="space-y-4 text-center md:text-left">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-950/45 p-6 rounded-2xl border border-slate-900 glass">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 bg-brand-card p-6 rounded-md border border-brand-border shadow-sm">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-100 uppercase font-mono">
-              SOCIAL MEDIA <span className="text-cyan-400">ACCOUNTS</span>
+            <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-brand-navy uppercase font-sans">
+              Marketplace <span className="text-brand-red">Inventory</span>
             </h1>
-            <p className="text-xs text-slate-400 mt-1 max-w-xl">
-              Browse premium social media accounts across Instagram, TikTok, Twitter/X, YouTube, and Facebook. Every listing includes verified follower counts, engagement rates, and full credentials upon purchase.
+            <p className="text-xs text-brand-muted mt-1 max-w-xl leading-relaxed">
+              Acquire pre-screened social media accounts across Instagram, TikTok, Twitter/X, YouTube, and Facebook. Each asset features verified statistics and automated escrow verification.
             </p>
           </div>
 
-          <div className="flex flex-wrap md:flex-nowrap gap-4 w-full md:w-auto">
-            <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-slate-950 border border-slate-900 flex-1 min-w-[130px]">
-              <Users className="text-cyan-400 w-5 h-5 shrink-0" />
+          <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded bg-brand-bg border border-brand-border flex-1 min-w-[130px]">
+              <Users className="text-brand-navy w-4 h-4 shrink-0" />
               <div>
-                <span className="text-[10px] text-slate-500 font-mono block">TOTAL REACH</span>
-                <span className="text-sm font-semibold text-slate-200 font-mono">{(totalFollowers / 1_000_000).toFixed(1)}M+</span>
+                <span className="text-[9px] text-brand-muted font-bold block uppercase tracking-wider">Total Reach</span>
+                <span className="text-xs font-bold text-brand-navy font-mono">{(totalFollowers / 1_000_000).toFixed(1)}M+</span>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-slate-950 border border-slate-900 flex-1 min-w-[130px]">
-              <Star className="text-purple-400 w-5 h-5 shrink-0" />
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded bg-brand-bg border border-brand-border flex-1 min-w-[130px]">
+              <Star className="text-brand-red w-4 h-4 shrink-0" />
               <div>
-                <span className="text-[10px] text-slate-500 font-mono block">ACCOUNTS</span>
-                <span className="text-sm font-semibold text-slate-200 font-mono">{totalAccounts} Listed</span>
+                <span className="text-[9px] text-brand-muted font-bold block uppercase tracking-wider">Active Assets</span>
+                <span className="text-xs font-bold text-brand-navy font-mono">{totalAccounts} listed</span>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-slate-950 border border-slate-900 flex-1 min-w-[130px]">
-              <ShieldCheck className="text-emerald-400 w-5 h-5 shrink-0" />
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded bg-brand-bg border border-brand-border flex-1 min-w-[130px]">
+              <ShieldCheck className="text-brand-navy w-4 h-4 shrink-0" />
               <div>
-                <span className="text-[10px] text-slate-500 font-mono block">GUARANTEE</span>
-                <span className="text-sm font-semibold text-slate-200 font-mono">72hr Protection</span>
+                <span className="text-[9px] text-brand-muted font-bold block uppercase tracking-wider">Escrow Holds</span>
+                <span className="text-xs font-bold text-brand-navy font-mono">72hr Guarantee</span>
               </div>
             </div>
           </div>
@@ -79,65 +79,64 @@ export const CatalogView: React.FC = () => {
 
       {/* DB Setup Warning Block */}
       {dbError && (
-        <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-500/20 text-left space-y-3 font-mono">
-          <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+        <div className="p-5 rounded bg-red-50 border border-red-200 text-left space-y-3 font-mono text-brand-red">
+          <div className="flex items-center gap-2 font-bold text-sm">
             <ShieldCheck size={18} className="rotate-180" />
-            <span>SUPABASE DATABASE SYNC ERROR</span>
+            <span>DATABASE INTEGRATION ERROR</span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            The frontend is connected to your Supabase project, but could not retrieve products. 
-            This usually means the database tables do not exist yet or are not seeded.
+          <p className="text-xs text-brand-navy leading-relaxed font-sans">
+            Connected to Supabase, but could not fetch product listings. Ensure schema tables are built and seeded in the database.
           </p>
-          <div className="bg-slate-950/65 p-3 rounded-lg border border-slate-900/60 text-[10px] text-rose-300">
+          <div className="bg-brand-card p-3 rounded border border-red-200/60 text-[10px]">
             Error: {dbError}
           </div>
-          <div className="text-xs text-slate-400 font-sans space-y-1">
-            <p className="font-semibold text-slate-200">How to resolve this:</p>
-            <p>1. Open your Supabase Dashboard and go to the SQL Editor.</p>
-            <p>2. Paste and run the database structure script: <a href="file:///c:/Users/Gabby/Documents/logs_marketplace/supabase/schema.sql" className="text-cyan-400 underline hover:text-cyan-300">supabase/schema.sql</a></p>
-            <p>3. Paste and run the mock accounts seed script: <a href="file:///c:/Users/Gabby/Documents/logs_marketplace/supabase/seed.sql" className="text-cyan-400 underline hover:text-cyan-300">supabase/seed.sql</a></p>
+          <div className="text-xs text-brand-muted font-sans space-y-1.5">
+            <p className="font-bold text-brand-navy">Resolution Steps:</p>
+            <p>1. Open your Supabase Workspace SQL Editor.</p>
+            <p>2. Load and execute the schema: <a href="file:///home/gabby/Documents/Logs_marketplace/supabase/schema.sql" className="text-brand-red underline hover:text-brand-red-hover">supabase/schema.sql</a></p>
+            <p>3. Load and execute the seeds: <a href="file:///home/gabby/Documents/Logs_marketplace/supabase/seed.sql" className="text-brand-red underline hover:text-brand-red-hover">supabase/seed.sql</a></p>
           </div>
         </div>
       )}
 
+      {/* Empty State Warning */}
       {!dbError && isSupabaseConfigured() && products.length === 0 && !loading && (
-        <div className="p-5 rounded-2xl bg-amber-950/20 border border-amber-500/20 text-left space-y-3 font-mono">
-          <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+        <div className="p-5 rounded bg-amber-50 border border-amber-200 text-left space-y-3 font-mono text-amber-800">
+          <div className="flex items-center gap-2 font-bold text-sm">
             <ShieldCheck size={18} />
-            <span>DATABASE IS EMPTY</span>
+            <span>DATABASE INVENTORY EMPTY</span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            Your Supabase products table is successfully connected, but contains zero accounts.
+          <p className="text-xs text-brand-navy leading-relaxed font-sans">
+            Supabase is successfully synced, but the products table contains zero rows.
           </p>
-          <div className="text-xs text-slate-400 font-sans space-y-1">
-            <p className="font-semibold text-slate-200">How to seed inventory:</p>
-            <p>Run the SQL statements from your local project seed file: <a href="file:///c:/Users/Gabby/Documents/logs_marketplace/supabase/seed.sql" className="text-cyan-400 underline hover:text-cyan-300">supabase/seed.sql</a> inside your Supabase dashboard SQL editor.</p>
+          <div className="text-xs text-brand-muted font-sans space-y-1">
+            <p className="font-bold text-brand-navy">How to seed inventory:</p>
+            <p>Execute the SQL commands in <a href="file:///home/gabby/Documents/Logs_marketplace/supabase/seed.sql" className="text-brand-red underline hover:text-brand-red-hover">supabase/seed.sql</a> inside your database SQL editor.</p>
           </div>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-950/30 border border-slate-900 glass">
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+      {/* Filters Bar */}
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-4 p-4 rounded bg-brand-card border border-brand-border shadow-sm">
+        <div className="relative w-full lg:w-80">
+          <Search className="absolute left-3 top-2.5 text-brand-muted w-4 h-4" />
           <input
             type="text"
-            placeholder="Search accounts, platforms, niches..."
+            placeholder="Search accounts, niches, platforms..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition font-mono"
+            className="w-full pl-9 pr-4 py-2 text-xs rounded bg-brand-bg border border-brand-border text-brand-navy focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 transition"
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto py-1 scrollbar-thin">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto py-1 scrollbar-thin">
           {platforms.map((plat) => (
             <button
               key={plat}
               onClick={() => setSelectedPlatform(plat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                selectedPlatform === plat
-                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
-                  : 'bg-slate-950/60 border border-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              className={`px-3 py-1.5 rounded text-xs font-bold whitespace-nowrap transition cursor-pointer border ${selectedPlatform === plat
+                ? 'bg-brand-navy border-brand-navy text-brand-bg'
+                : 'bg-brand-bg border-brand-border text-brand-muted hover:text-brand-navy hover:bg-brand-navy/5'
               }`}
             >
               {plat}
@@ -145,12 +144,12 @@ export const CatalogView: React.FC = () => {
           ))}
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto shrink-0 justify-end">
-          <ArrowUpDown size={14} className="text-slate-500" />
+        <div className="flex items-center gap-2 w-full lg:w-auto shrink-0 justify-end">
+          <ArrowUpDown size={14} className="text-brand-muted" />
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="bg-slate-950 border border-slate-800 text-slate-300 py-1.5 px-3 rounded-lg text-xs font-mono focus:outline-none focus:border-cyan-500 cursor-pointer"
+            className="bg-brand-bg border border-brand-border text-brand-navy py-1.5 px-3 rounded text-xs font-bold focus:outline-none focus:border-brand-navy cursor-pointer"
           >
             <option value="followers">Followers (Most)</option>
             <option value="engagement">Engagement (Highest)</option>
@@ -163,15 +162,15 @@ export const CatalogView: React.FC = () => {
 
       {/* Grid */}
       {loading ? (
-        <div className="py-20 text-center rounded-2xl bg-slate-950/20 border border-slate-900 glass flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin"></div>
-          <span className="text-xs font-mono text-slate-500">Querying Supabase Ledger...</span>
+        <div className="py-20 text-center rounded bg-brand-card border border-brand-border flex flex-col items-center justify-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-brand-navy/20 border-t-brand-red animate-spin"></div>
+          <span className="text-xs font-mono text-brand-muted">Loading Marketplace Inventory...</span>
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="py-20 text-center rounded-2xl bg-slate-950/20 border border-dashed border-slate-900 glass">
-          <Users size={40} className="mx-auto text-slate-600 mb-3" />
-          <p className="text-sm font-semibold text-slate-400">No Accounts Match Your Search</p>
-          <p className="text-xs text-slate-600 mt-1">Try clearing filters or searching for different keywords</p>
+        <div className="py-20 text-center rounded bg-brand-card border border-brand-border shadow-sm">
+          <Users size={32} className="mx-auto text-brand-muted mb-3" />
+          <p className="text-sm font-bold text-brand-navy">No Listings Match Filters</p>
+          <p className="text-xs text-brand-muted mt-1">Try expanding search inputs or select another platform tab</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

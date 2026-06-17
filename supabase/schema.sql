@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.products (
     verified BOOLEAN DEFAULT FALSE,
     niche TEXT,
     tags JSONB DEFAULT '[]'::jsonb,
-    sample_data TEXT,
+    sample_data JSONB DEFAULT '{}'::jsonb,
     encrypted_credentials TEXT, -- AES-256 encrypted payload
     status TEXT DEFAULT 'active' CHECK (status IN ('draft', 'active', 'sold')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -79,7 +79,11 @@ ALTER TABLE public.purchased_accounts ENABLE ROW LEVEL SECURITY;
 -- ========================================================
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
 BEGIN
     INSERT INTO public.profiles (id, email, role)
     VALUES (
@@ -93,7 +97,7 @@ BEGIN
     );
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Recreate trigger if exists
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -108,14 +112,18 @@ CREATE TRIGGER on_auth_user_created
 
 -- Checks if a user is an admin (Security Definer bypasses RLS checks on profiles)
 CREATE OR REPLACE FUNCTION public.is_admin(user_id UUID)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
 BEGIN
     RETURN EXISTS (
         SELECT 1 FROM public.profiles 
         WHERE id = user_id AND role = 'admin'
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 
 -- ========================================================
@@ -186,7 +194,11 @@ USING (public.is_admin(auth.uid()));
 
 -- Atomic Checkout RPC (completes checkout using Paystack reference)
 CREATE OR REPLACE FUNCTION public.complete_checkout(product_id_param UUID, reference_param TEXT)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
 DECLARE
     buyer_id_var UUID;
     product_price_var NUMERIC(10, 2);
@@ -232,12 +244,16 @@ BEGIN
 
     RETURN TRUE;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 
 -- Secure asset decryption/retrieval RPC
 CREATE OR REPLACE FUNCTION public.get_purchased_asset_data(product_id_param UUID)
-RETURNS TEXT AS $$
+RETURNS TEXT 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
 DECLARE
     buyer_id_var UUID;
     credentials_var TEXT;
@@ -263,8 +279,58 @@ BEGIN
 
     RETURN credentials_var;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+-- Secure complete checkout function called by Edge Functions
+CREATE OR REPLACE FUNCTION public.complete_checkout_secured(product_id_param UUID, reference_param TEXT, buyer_id_param UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    product_price_var NUMERIC(10, 2);
+    transaction_id_var UUID;
+BEGIN
+    -- 1. Verify Paystack reference hasn't been reused
+    IF EXISTS (
+        SELECT 1 FROM public.transactions 
+        WHERE paystack_reference = reference_param
+    ) THEN
+        RAISE EXCEPTION 'Transaction reference already processed';
+    END IF;
+
+    -- 2. Get and lock the product for update (ensure it is active)
+    SELECT price INTO product_price_var 
+    FROM public.products 
+    WHERE id = product_id_param AND status = 'active'
+    FOR UPDATE;
+
+    IF product_price_var IS NULL THEN
+        RAISE EXCEPTION 'Product not found or already sold';
+    END IF;
+
+    -- 3. Update product status to sold
+    UPDATE public.products 
+    SET status = 'sold' 
+    WHERE id = product_id_param;
+
+    -- 4. Record transaction entry
+    INSERT INTO public.transactions (user_id, type, amount, status, payment_method, payment_reference, paystack_reference)
+    VALUES (buyer_id_param, 'purchase', product_price_var, 'completed', 'card', 'Purchase of account: ' || product_id_param, reference_param)
+    RETURNING id INTO transaction_id_var;
+
+    -- 5. Map product to purchased accounts list
+    INSERT INTO public.purchased_accounts (buyer_id, product_id, transaction_id)
+    VALUES (buyer_id_param, product_id_param, transaction_id_var);
+
+    RETURN TRUE;
+END;
+$$;
 
 -- Grant EXECUTE privileges to all authenticated users
 GRANT EXECUTE ON FUNCTION public.complete_checkout(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_purchased_asset_data(UUID) TO authenticated;
+
+-- Revoke execute permissions on the secure backend RPC from public client access
+REVOKE EXECUTE ON FUNCTION public.complete_checkout_secured(UUID, TEXT, UUID) FROM PUBLIC, anon, authenticated;

@@ -19,8 +19,42 @@ if (missingVars.length > 0) {
   }
 }
 
+// Custom cookie storage adapter for Supabase client session tracking (XSS mitigation)
+const cookieStorage = {
+  getItem: (key: string): string | null => {
+    const name = key + "=";
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i].trim();
+      if (c.indexOf(name) === 0) {
+        return c.substring(name.length, c.length);
+      }
+    }
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    const secureFlag = window.location.protocol === 'https:' ? 'Secure;' : '';
+    document.cookie = `${key}=${value}; path=/; ${secureFlag} SameSite=Strict`;
+  },
+  removeItem: (key: string): void => {
+    const secureFlag = window.location.protocol === 'https:' ? 'Secure;' : '';
+    document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; ${secureFlag} SameSite=Strict`;
+  }
+};
+
 // Export initialized client (with fallback only for dev environment if env is not loaded yet)
-export const supabase = createClient(supabaseUrl || 'https://mock.supabase.co', supabasePublishableKey || 'mock-publishable-key');
+export const supabase = createClient(
+  supabaseUrl || 'https://mock.supabase.co',
+  supabasePublishableKey || 'mock-publishable-key',
+  {
+    auth: {
+      storage: cookieStorage,
+      persistSession: true,
+      autoRefreshToken: true
+    }
+  }
+);
 
 // Utility to check if Supabase is connected to actual credentials
 export const isSupabaseConfigured = () => missingVars.length === 0;

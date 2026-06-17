@@ -16,7 +16,7 @@ export interface Product {
   verified: boolean;
   niche: string;
   tags: string[];
-  sampleData: string;
+  sampleData: Record<string, string>;
   fullDataContent: string;
 }
 
@@ -44,24 +44,24 @@ export const mockProducts: Product[] = [
     verified: false,
     niche: 'Fitness & Wellness',
     tags: ['Fitness', 'Lifestyle', 'Reels', 'OG Email'],
-    sampleData: `
-Platform     : Instagram
-Handle       : @fitlife.gains
-Niche        : Fitness / Wellness / Nutrition
-Followers    : 180,400
-Following    : 812
-Posts        : 620
-Avg Likes    : 6,100
-Avg Comments : 142
-Engagement   : 4.7%
-Story Views  : ~14,400 / story
-Account Age  : 4 years (Created Jan 2021)
-Past Bans    : None
-OG Email     : Included
-2FA Status   : Disabled (transfer-ready)
-Bio          : 💪 Helping you build the body & life you want | Collab → fitlifegains@proton.me
-Last Active  : 2 days ago
-`,
+    sampleData: {
+      "Platform": "Instagram",
+      "Handle": "@fitlife.gains",
+      "Niche": "Fitness / Wellness / Nutrition",
+      "Followers": "180,400",
+      "Following": "812",
+      "Posts": "620",
+      "Avg Likes": "6,100",
+      "Avg Comments": "142",
+      "Engagement": "4.7%",
+      "Story Views": "~14,400 / story",
+      "Account Age": "4 years (Created Jan 2021)",
+      "Past Bans": "None",
+      "OG Email": "Included",
+      "2FA Status": "Disabled (transfer-ready)",
+      "Bio": "💪 Helping you build the body & life you want | Collab → fitlifegains@proton.me",
+      "Last Active": "2 days ago"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @fitlife.gains     ║
@@ -109,25 +109,25 @@ TRANSFER NOTES
     verified: false,
     niche: 'Crypto & DeFi',
     tags: ['Crypto', 'DeFi', 'Finance', 'Threads', 'X Premium'],
-    sampleData: `
-Platform     : Twitter / X
-Handle       : @CryptoPulseX
-Niche        : Cryptocurrency / DeFi / Web3 Analysis
-Followers    : 92,100
-Following    : 1,430
-Tweets       : 8,450
-Avg Likes    : 1,240
-Avg Retweets : 310
-Avg Replies  : 88
-Engagement   : 3.9%
-Account Age  : 3 years (Created Apr 2022)
-X Premium    : Active (Creator monetization enabled)
-Past Bans    : None
-Community Notes: 0 violations
-OG Email     : Included
-2FA Status   : Disabled
-Last Active  : Today
-`,
+    sampleData: {
+      "Platform": "Twitter / X",
+      "Handle": "@CryptoPulseX",
+      "Niche": "Cryptocurrency / DeFi / Web3 Analysis",
+      "Followers": "92,100",
+      "Following": "1,430",
+      "Tweets": "8,450",
+      "Avg Likes": "1,240",
+      "Avg Retweets": "310",
+      "Avg Replies": "88",
+      "Engagement": "3.9%",
+      "Account Age": "3 years (Created Apr 2022)",
+      "X Premium": "Active (Creator monetization enabled)",
+      "Past Bans": "None",
+      "Community Notes": "0 violations",
+      "OG Email": "Included",
+      "2FA Status": "Disabled",
+      "Last Active": "Today"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @CryptoPulseX     ║
@@ -174,27 +174,27 @@ TRANSFER NOTES
     verified: false,
     niche: 'Fashion & Style',
     tags: ['Fashion', 'TikTok Shop', 'Creator Fund', 'Viral'],
-    sampleData: `
-Platform     : TikTok
-Handle       : @styledbysena
-Niche        : Fashion / OOTD / Haul Videos
-Followers    : 521,800
-Following    : 320
-Videos       : 380
-Total Likes  : 8.4M
-Avg Views    : 180,000 / video
-Avg Likes    : 22,000
-Engagement   : 6.1%
-Account Age  : ~2.5 years
-TikTok Shop  : Connected (affiliate active)
-Creator Fund : Active (~$200–$400/mo)
-Demographics : 82% Female | US 44% | UK 18% | AU 12%
-Past Bans    : None
-Viral Videos : 3 videos >2M views
-OG Email     : Included
-2FA          : Disabled
-Last Active  : Today
-`,
+    sampleData: {
+      "Platform": "TikTok",
+      "Handle": "@styledbysena",
+      "Niche": "Fashion / OOTD / Haul Videos",
+      "Followers": "521,800",
+      "Following": "320",
+      "Videos": "380",
+      "Total Likes": "8.4M",
+      "Avg Views": "180,000 / video",
+      "Avg Likes": "22,000",
+      "Engagement": "6.1%",
+      "Account Age": "~2.5 years",
+      "TikTok Shop": "Connected (affiliate active)",
+      "Creator Fund": "Active (~$200–$400/mo)",
+      "Demographics": "82% Female | US 44% | UK 18% | AU 12%",
+      "Past Bans": "None",
+      "Viral Videos": "3 videos >2M views",
+      "OG Email": "Included",
+      "2FA": "Disabled",
+      "Last Active": "Today"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @styledbysena      ║
@@ -242,25 +242,25 @@ TRANSFER NOTES
     verified: false,
     niche: 'Gaming (FPS / RPG)',
     tags: ['Gaming', 'AdSense', 'Monetized', 'YouTube Partner'],
-    sampleData: `
-Platform       : YouTube
-Channel        : GhostFrame Gaming
-Handle         : @GhostFrameGG
-Niche          : FPS / RPG Gaming (Warzone, Elden Ring, Destiny 2)
-Subscribers    : 211,400
-Total Videos   : 412
-Total Views    : 48.7M
-Avg Views/Vid  : 118,000
-Avg Watch Time : 8m 22s
-Engagement     : 5.3%
-AdSense        : Active — $950–$1,400/mo
-YT Partner     : Yes (MPP enrolled)
-Sponsorships   : Corsair, SteelSeries, G2A
-Account Age    : 5 years
-Strikes        : 0
-Copyright      : 0 claims active
-OG Email       : Included
-`,
+    sampleData: {
+      "Platform": "YouTube",
+      "Channel": "GhostFrame Gaming",
+      "Handle": "@GhostFrameGG",
+      "Niche": "FPS / RPG Gaming (Warzone, Elden Ring, Destiny 2)",
+      "Subscribers": "211,400",
+      "Total Videos": "412",
+      "Total Views": "48.7M",
+      "Avg Views/Vid": "118,000",
+      "Avg Watch Time": "8m 22s",
+      "Engagement": "5.3%",
+      "AdSense": "Active — $950–$1,400/mo",
+      "YT Partner": "Yes (MPP enrolled)",
+      "Sponsorships": "Corsair, SteelSeries, G2A",
+      "Account Age": "5 years",
+      "Strikes": "0",
+      "Copyright": "0 claims active",
+      "OG Email": "Included"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — CHANNEL: GhostFrame Gaming ║
@@ -308,24 +308,24 @@ TRANSFER NOTES
     verified: false,
     niche: 'Food & Recipe',
     tags: ['Food', 'Recipes', 'Lifestyle', 'Carousels'],
-    sampleData: `
-Platform     : Instagram
-Handle       : @theforkdiaries
-Niche        : Food / Recipes / Home Cooking
-Followers    : 45,200
-Following    : 1,200
-Posts        : 290 (75% Carousels, 25% Reels)
-Avg Likes    : 2,100
-Avg Comments : 148
-Engagement   : 7.2%
-Story Views  : ~3,600 / story
-Account Age  : 2 years
-Past Bans    : None
-Past Sponsors: HelloFresh, Ninja, Simply Cook, OXO
-Demographics : 79% Female | US 61% | UK 22%
-OG Email     : Included
-2FA          : Disabled
-`,
+    sampleData: {
+      "Platform": "Instagram",
+      "Handle": "@theforkdiaries",
+      "Niche": "Food / Recipes / Home Cooking",
+      "Followers": "45,200",
+      "Following": "1,200",
+      "Posts": "290 (75% Carousels, 25% Reels)",
+      "Avg Likes": "2,100",
+      "Avg Comments": "148",
+      "Engagement": "7.2%",
+      "Story Views": "~3,600 / story",
+      "Account Age": "2 years",
+      "Past Bans": "None",
+      "Past Sponsors": "HelloFresh, Ninja, Simply Cook, OXO",
+      "Demographics": "79% Female | US 61% | UK 22%",
+      "OG Email": "Included",
+      "2FA": "Disabled"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @theforkdiaries    ║
@@ -372,23 +372,23 @@ TRANSFER NOTES
     verified: false,
     niche: 'Travel & Tourism',
     tags: ['Travel', 'Facebook Page', 'Ad Account', 'In-Stream Ads'],
-    sampleData: `
-Platform     : Facebook
-Page Name    : Wanderlust World Travel
-Page Type    : Business Page (Travel Agency / Creator)
-Page Likes   : 88,400
-Followers    : 91,200
-Posts        : 1,840
-Avg Reach    : 52,000 per post
-Avg Engagement: 2.8%
-In-Stream Ads: Active (~$180/mo)
-Ad Account   : Clean standing (no restrictions)
-Meta Pixel   : Installed
-Account Age  : 6 years
-Past Bans    : None
-Monetization : In-stream video ads + affiliate travel links
-Admin Email  : Included
-`,
+    sampleData: {
+      "Platform": "Facebook",
+      "Page Name": "Wanderlust World Travel",
+      "Page Type": "Business Page (Travel Agency / Creator)",
+      "Page Likes": "88,400",
+      "Followers": "91,200",
+      "Posts": "1,840",
+      "Avg Reach": "52,000 per post",
+      "Avg Engagement": "2.8%",
+      "In-Stream Ads": "Active (~$180/mo)",
+      "Ad Account": "Clean standing (no restrictions)",
+      "Meta Pixel": "Installed",
+      "Account Age": "6 years",
+      "Past Bans": "None",
+      "Monetization": "In-stream video ads + affiliate travel links",
+      "Admin Email": "Included"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    PAGE CREDENTIALS — Wanderlust World Travel        ║
@@ -438,22 +438,22 @@ TRANSFER NOTES
     verified: false,
     niche: 'Lifestyle (Rebrand-Ready)',
     tags: ['Aged', '5 Years', 'Rebrand', 'OG Email', 'No Violations'],
-    sampleData: `
-Platform     : TikTok
-Handle       : @lifewithjordan__
-Niche        : Lifestyle (rebrand-ready)
-Followers    : 12,100
-Following    : 440
-Videos       : 145
-Total Likes  : 280,000
-Avg Views    : 9,500 / video
-Account Age  : 5 years (Created Feb 2020)
-Violations   : None
-Shadowban    : Never
-OG Email     : Included
-2FA          : Disabled
-Notes        : Ideal for rebrand — aged accounts get priority reach from TikTok algo
-`,
+    sampleData: {
+      "Platform": "TikTok",
+      "Handle": "@lifewithjordan__",
+      "Niche": "Lifestyle (rebrand-ready)",
+      "Followers": "12,100",
+      "Following": "440",
+      "Videos": "145",
+      "Total Likes": "280,000",
+      "Avg Views": "9,500 / video",
+      "Account Age": "5 years (Created Feb 2020)",
+      "Violations": "None",
+      "Shadowban": "Never",
+      "OG Email": "Included",
+      "2FA": "Disabled",
+      "Notes": "Ideal for rebrand — aged accounts get priority reach from TikTok algo"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @lifewithjordan__  ║
@@ -503,24 +503,24 @@ TRANSFER NOTES
     verified: true,
     niche: 'Entertainment & Celebrity',
     tags: ['Verified', 'Blue Tick', 'Entertainment', 'Media', 'High Value'],
-    sampleData: `
-Platform     : Instagram
-Handle       : @celebdigest.official
-Niche        : Celebrity News / Entertainment / Pop Culture
-Followers    : 341,200
-Following    : 290
-Posts        : 2,100
-Avg Likes    : 14,800
-Avg Comments : 620
-Engagement   : 5.8%
-Story Views  : ~28,000 / story
-Account Age  : 3 years
-Verified     : ✅ Meta Verified (Blue Checkmark)
-Past Bans    : None
-Press Coverage: 2 mentions in BuzzFeed, 1 in Daily Mail
-OG Email     : Included
-2FA          : Disabled (transfer-ready)
-`,
+    sampleData: {
+      "Platform": "Instagram",
+      "Handle": "@celebdigest.official",
+      "Niche": "Celebrity News / Entertainment / Pop Culture",
+      "Followers": "341,200",
+      "Following": "290",
+      "Posts": "2,100",
+      "Avg Likes": "14,800",
+      "Avg Comments": "620",
+      "Engagement": "5.8%",
+      "Story Views": "~28,000 / story",
+      "Account Age": "3 years",
+      "Verified": "✅ Meta Verified (Blue Checkmark)",
+      "Past Bans": "None",
+      "Press Coverage": "2 mentions in BuzzFeed, 1 in Daily Mail",
+      "OG Email": "Included",
+      "2FA": "Disabled (transfer-ready)"
+    },
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @celebdigest.off.. ║

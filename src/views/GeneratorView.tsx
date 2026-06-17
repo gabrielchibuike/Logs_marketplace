@@ -46,34 +46,34 @@ export const GeneratorView: React.FC = () => {
     n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(0)}K` : `${n}`;
 
   return (
-    <div className="w-full py-6 space-y-6">
+    <div className="w-full py-4 space-y-6">
       {/* Title */}
-      <div className="bg-slate-950/45 p-6 rounded-2xl border border-slate-900 glass text-left">
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-100 uppercase font-mono flex items-center gap-2">
-          <Cpu className="text-cyan-400 w-6 h-6 animate-pulse-slow" />
-          ACCOUNT <span className="text-cyan-400">FINDER</span>
+      <div className="bg-brand-card p-6 rounded-md border border-brand-border shadow-sm text-left">
+        <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-brand-navy uppercase font-sans flex items-center gap-2">
+          <Cpu className="text-brand-red w-5 h-5" />
+          Account <span className="text-brand-red">Finder</span>
         </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Set your requirements below and find the perfect social media account. Filter by platform, follower count, engagement rate, price range, and account type.
+        <p className="text-xs text-brand-muted mt-1 leading-relaxed">
+          Configure search constraints below to discover matching listings. Filter by platform, followers count, target budget, and asset parameters.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Controls Panel */}
-        <div className="lg:col-span-1 glass rounded-2xl p-5 border border-slate-800 space-y-6 text-left">
-          <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5 border-b border-slate-850 pb-2.5">
-            <SlidersHorizontal size={16} className="text-cyan-400" /> Search Filters
+        <div className="lg:col-span-1 bg-brand-card rounded-md p-5 border border-brand-border shadow-sm space-y-6 text-left">
+          <h2 className="text-xs font-bold text-brand-navy uppercase tracking-wider font-sans flex items-center gap-1.5 border-b border-brand-border pb-2.5">
+            <SlidersHorizontal size={15} className="text-brand-red" /> Search Parameters
           </h2>
 
           {/* Platform */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
-              Platform
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-brand-muted uppercase tracking-wider font-sans">
+              Platform Tab
             </label>
             <select
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 text-slate-300 py-2 px-3 rounded-lg text-xs font-mono focus:outline-none focus:border-cyan-500 cursor-pointer"
+              className="w-full bg-brand-bg border border-brand-border text-brand-navy py-2 px-3 rounded text-xs font-bold focus:outline-none focus:border-brand-navy cursor-pointer"
             >
               {platforms.map((p) => (
                 <option key={p} value={p}>{p}</option>
@@ -82,14 +82,14 @@ export const GeneratorView: React.FC = () => {
           </div>
 
           {/* Category */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
-              Account Type
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-brand-muted uppercase tracking-wider font-sans">
+              Account Niche Type
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 text-slate-300 py-2 px-3 rounded-lg text-xs font-mono focus:outline-none focus:border-cyan-500 cursor-pointer"
+              className="w-full bg-brand-bg border border-brand-border text-brand-navy py-2 px-3 rounded text-xs font-bold focus:outline-none focus:border-brand-navy cursor-pointer"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -98,10 +98,10 @@ export const GeneratorView: React.FC = () => {
           </div>
 
           {/* Min Followers */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] font-bold text-brand-muted uppercase tracking-wider font-sans">
               <span><Users size={10} className="inline mb-0.5" /> Min Followers</span>
-              <span className="text-cyan-400 font-bold">{formatFollowers(minFollowers)}+</span>
+              <span className="text-brand-navy font-bold">{formatFollowers(minFollowers)}+</span>
             </div>
             <input
               type="range"
@@ -110,15 +110,15 @@ export const GeneratorView: React.FC = () => {
               step="5000"
               value={minFollowers}
               onChange={(e) => setMinFollowers(parseInt(e.target.value))}
-              className="w-full accent-cyan-500 bg-slate-950 cursor-pointer"
+              className="w-full accent-brand-navy bg-brand-border h-1.5 rounded cursor-pointer"
             />
           </div>
 
           {/* Min Engagement */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] font-bold text-brand-muted uppercase tracking-wider font-sans">
               <span><Heart size={10} className="inline mb-0.5" /> Min Engagement</span>
-              <span className="text-emerald-400 font-bold">{minEngagement}%+</span>
+              <span className="text-brand-navy font-bold">{minEngagement}%+</span>
             </div>
             <input
               type="range"
@@ -127,15 +127,15 @@ export const GeneratorView: React.FC = () => {
               step="0.5"
               value={minEngagement}
               onChange={(e) => setMinEngagement(parseFloat(e.target.value))}
-              className="w-full accent-emerald-500 bg-slate-950 cursor-pointer"
+              className="w-full accent-brand-red bg-brand-border h-1.5 rounded cursor-pointer"
             />
           </div>
 
           {/* Max Price */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] font-bold text-brand-muted uppercase tracking-wider font-sans">
               <span><Clock size={10} className="inline mb-0.5" /> Max Budget</span>
-              <span className="text-purple-400 font-bold">₦{maxPrice.toFixed(0)}</span>
+              <span className="text-brand-red font-bold">₦{maxPrice.toFixed(0)}</span>
             </div>
             <input
               type="range"
@@ -144,22 +144,22 @@ export const GeneratorView: React.FC = () => {
               step="25"
               value={maxPrice}
               onChange={(e) => setMaxPrice(parseInt(e.target.value))}
-              className="w-full accent-purple-500 bg-slate-950 cursor-pointer"
+              className="w-full accent-brand-red bg-brand-border h-1.5 rounded cursor-pointer"
             />
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-2">
             <button
               onClick={handleSearch}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition duration-200 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 rounded bg-brand-red hover:bg-brand-red-hover text-white text-xs font-bold transition duration-200 cursor-pointer"
             >
-              <Search size={14} /> Find Accounts
+              <Search size={14} /> Find Listings
             </button>
             <button
               onClick={handleReset}
-              className="py-3 px-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition duration-200 cursor-pointer"
-              title="Reset filters"
+              className="py-2.5 px-3 rounded bg-brand-bg border border-brand-border text-brand-muted hover:text-brand-navy hover:bg-brand-navy/5 transition duration-200 cursor-pointer"
+              title="Reset Filters"
             >
               <RefreshCw size={14} />
             </button>
@@ -171,12 +171,12 @@ export const GeneratorView: React.FC = () => {
           {hasSearched ? (
             results.length > 0 ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400 font-mono">
-                    Found <span className="text-cyan-400 font-bold">{results.length}</span> matching account(s)
+                <div className="flex items-center justify-between text-left">
+                  <span className="text-xs text-brand-muted font-mono">
+                    Found <span className="text-brand-red font-bold">{results.length}</span> matching item(s)
                   </span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {results.map((product) => (
                     <ProductCard
                       key={product.id}
@@ -187,20 +187,20 @@ export const GeneratorView: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl bg-slate-950/20 py-20 text-center glass">
-                <Users size={48} className="text-slate-700 mb-3" />
-                <h3 className="text-sm font-semibold text-slate-400">No Accounts Found</h3>
-                <p className="text-xs text-slate-600 max-w-sm mt-1">
-                  No accounts match your current filters. Try adjusting your requirements or increasing your budget.
+              <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-brand-border rounded bg-brand-card py-20 text-center">
+                <Users size={32} className="text-brand-muted mb-3" />
+                <h3 className="text-sm font-bold text-brand-navy">No Matches Found</h3>
+                <p className="text-xs text-brand-muted max-w-xs mt-1">
+                  Adjust parameter sliders or explore other platforms to load more results.
                 </p>
               </div>
             )
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl bg-slate-950/20 py-20 text-center glass">
-              <Cpu size={48} className="text-slate-700 animate-pulse-slow mb-3" />
-              <h3 className="text-sm font-semibold text-slate-400">Configure Your Search</h3>
-              <p className="text-xs text-slate-600 max-w-sm mt-1">
-                Set your requirements using the filters on the left and click "Find Accounts" to discover matching listings.
+            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-brand-border rounded bg-brand-card py-20 text-center">
+              <Cpu size={32} className="text-brand-muted mb-3" />
+              <h3 className="text-sm font-bold text-brand-navy">Configure Requirements</h3>
+              <p className="text-xs text-brand-muted max-w-xs mt-1">
+                Use the settings panel on the left to set custom metrics targets and discover assets.
               </p>
             </div>
           )}

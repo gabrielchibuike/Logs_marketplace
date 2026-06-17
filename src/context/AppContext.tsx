@@ -29,6 +29,8 @@ interface AppContextType {
   signUp: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -39,9 +41,9 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onClose: (id: string) => void 
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
       {toasts.map((toast) => {
         const typeStyles = {
-          success: 'border-emerald-500/30 text-emerald-400 bg-emerald-950/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]',
-          error: 'border-rose-500/30 text-rose-400 bg-rose-950/40 shadow-[0_0_15px_rgba(244,63,94,0.15)]',
-          info: 'border-cyan-500/30 text-cyan-400 bg-cyan-950/40 shadow-[0_0_15px_rgba(6,182,212,0.15)]',
+          success: 'border-emerald-500/40 text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40',
+          error: 'border-brand-red/30 text-brand-red bg-red-50 dark:bg-rose-950/40',
+          info: 'border-brand-navy/20 text-brand-navy bg-brand-card dark:border-brand-border',
         };
 
         const icons = {
@@ -53,7 +55,7 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onClose: (id: string) => void 
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-start justify-between gap-3 p-4 rounded-xl border backdrop-blur-md transition-all duration-300 transform translate-y-0 animate-slide-in font-mono text-xs ${typeStyles[toast.type]}`}
+            className={`pointer-events-auto flex items-start justify-between gap-3 p-4 rounded-md border backdrop-blur-md transition-all duration-300 transform translate-y-0 font-mono text-xs shadow-lg ${typeStyles[toast.type]}`}
           >
             <div className="flex gap-2.5 items-start">
               {icons[toast.type]}
@@ -61,7 +63,7 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onClose: (id: string) => void 
             </div>
             <button
               onClick={() => onClose(toast.id)}
-              className="text-slate-500 hover:text-slate-200 transition cursor-pointer p-0.5 rounded-lg hover:bg-slate-900/40"
+              className="text-brand-muted hover:text-brand-navy transition cursor-pointer p-0.5 rounded hover:bg-brand-navy/5"
             >
               <X size={14} />
             </button>
@@ -78,6 +80,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved !== null ? JSON.parse(saved) : [];
   });
 
+  // ─── Theme (Light / Dark) ───
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('paidlogstore_theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+    // Fallback: respect OS preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('paidlogstore_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const [purchases, setPurchases] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -139,7 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             verified: item.verified,
             niche: item.niche || '',
             tags: Array.isArray(item.tags) ? item.tags : [],
-            sampleData: item.sample_data || '',
+            sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
             fullDataContent: '' // Protected credentials column not loaded on catalog fetch
           }));
           setProducts(formatted);
@@ -236,14 +259,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       setLoading(true);
-      const { error } = await supabase.rpc('complete_checkout', {
-        product_id_param: productId,
-        reference_param: reference
-      });
 
-      if (error) {
-        console.error('Failed to verify checkout on database:', error);
-        throw error;
+      if (!isSupabaseConfigured()) {
+        // Mock fallback for offline dev testing
+        showToast('Payment verified (MOCK MODE)! Digital asset credentials unlocked.', 'success');
+        setPurchases((prev) => [...prev, productId]);
+        setCart((prev) => prev.filter((id) => id !== productId));
+        return { success: true };
+      }
+
+      let success = false;
+      let errorMsg = '';
+
+      try {
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: { productId, reference }
+        });
+        if (error) throw error;
+        success = true;
+      } catch (edgeErr: any) {
+        console.warn(
+          'Edge function verify-payment failed or not deployed. Falling back to client-side RPC verification (SECURITY WARNING: Client-side tampering is possible in this fallback route).',
+          edgeErr
+        );
+        // Fallback to direct client RPC call (which uses complete_checkout)
+        const { data, error } = await supabase.rpc('complete_checkout', {
+          product_id_param: productId,
+          reference_param: reference
+        });
+        if (error) {
+          errorMsg = error.message;
+          throw error;
+        }
+        success = data;
+      }
+
+      if (!success) {
+        throw new Error(errorMsg || 'Checkout transaction registration failed.');
       }
 
       // Sync updated purchases mapping
@@ -255,9 +307,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Payment verified! Digital asset credentials unlocked.', 'success');
       return { success: true };
     } catch (err: any) {
-      console.error('Database checkout error:', err);
+      console.error('Checkout error:', err);
       showToast(err.message || 'Failed to verify transaction on database ledger.', 'error');
-      return { success: false, error: err.message || 'Database checkout transaction failed' };
+      return { success: false, error: err.message || 'Checkout transaction failed' };
     } finally {
       setLoading(false);
     }
@@ -338,7 +390,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       hasPurchased,
       signUp,
       signIn,
-      signOut
+      signOut,
+      theme,
+      toggleTheme
     }}>
       {children}
       <ToastContainer toasts={toasts} onClose={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />

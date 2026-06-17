@@ -35,13 +35,13 @@ export const LogTerminal: React.FC<LogTerminalProps> = ({ title, content, maxHei
     const isWarning = /WARN| 3\d{2} |" 30[0-9]/.test(line);
     const isSuccess = /INFO|SUCCESS| 2\d{2} |" 20[0-9]|Success/.test(line);
 
-    let textColor = 'text-slate-300';
+    let textColor = 'text-slate-200 dark:text-slate-800';
     if (isError) {
-      textColor = 'text-rose-400 font-semibold bg-rose-950/20 px-1 rounded';
+      textColor = 'text-rose-400 dark:text-rose-700 font-semibold bg-rose-950/20 dark:bg-rose-50 px-1 rounded';
     } else if (isWarning) {
-      textColor = 'text-amber-400 bg-amber-950/10 px-1 rounded';
+      textColor = 'text-amber-400 dark:text-amber-700 bg-amber-950/10 dark:bg-amber-50 px-1 rounded';
     } else if (isSuccess) {
-      textColor = 'text-emerald-400';
+      textColor = 'text-emerald-400 dark:text-emerald-600';
     }
 
     // Try to style brackets or timestamps if JSON
@@ -49,7 +49,7 @@ export const LogTerminal: React.FC<LogTerminalProps> = ({ title, content, maxHei
       try {
         // Highlight JSON keywords simply
         return (
-          <div key={index} className={`${textColor} font-mono text-sm leading-relaxed whitespace-pre-wrap break-all hover:bg-slate-900/40 py-0.5`}>
+          <div key={index} className={`${textColor} font-mono text-sm leading-relaxed whitespace-pre-wrap break-all hover:bg-brand-navy-light/40 py-0.5`}>
             {line}
           </div>
         );
@@ -59,7 +59,7 @@ export const LogTerminal: React.FC<LogTerminalProps> = ({ title, content, maxHei
     }
 
     return (
-      <div key={index} className={`${textColor} font-mono text-xs leading-relaxed whitespace-pre-wrap break-all hover:bg-slate-900/40 py-0.5`}>
+      <div key={index} className={`${textColor} font-mono text-xs leading-relaxed whitespace-pre-wrap break-all hover:bg-brand-navy-light/40 py-0.5`}>
         {line}
       </div>
     );
@@ -68,15 +68,15 @@ export const LogTerminal: React.FC<LogTerminalProps> = ({ title, content, maxHei
   const lines = content.split('\n');
 
   return (
-    <div className="w-full rounded-lg border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden flex flex-col font-mono">
+    <div className="w-full rounded-md border border-brand-navy-light bg-brand-navy shadow-sm overflow-hidden flex flex-col font-mono">
       {/* Terminal Title Bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
+      <div className="flex items-center justify-between px-4 py-3 bg-brand-navy-light border-b border-brand-navy">
         <div className="flex items-center space-x-2">
           <div className="w-3 h-3 rounded-full bg-rose-500"></div>
           <div className="w-3 h-3 rounded-full bg-amber-500"></div>
           <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-          <span className="text-xs text-slate-400 ml-2 flex items-center gap-1.5 select-none">
-            <Terminal size={12} className="text-cyan-400" />
+          <span className="text-xs text-slate-300 dark:text-gray-800 ml-2 flex items-center gap-1.5 select-none">
+            <Terminal size={12} className="text-brand-red" />
             {title}
           </span>
         </div>
@@ -84,14 +84,14 @@ export const LogTerminal: React.FC<LogTerminalProps> = ({ title, content, maxHei
           <button
             onClick={handleCopy}
             title="Copy to clipboard"
-            className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded transition duration-200"
+            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-white dark:hover:text-slate-800 hover:bg-brand-navy rounded transition duration-200 cursor-pointer"
           >
-            {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+            {copied ? <Check size={14} className="text-emerald-400 dark:text-emerald-600" /> : <Copy size={14} />}
           </button>
           <button
             onClick={handleDownload}
             title="Download log file"
-            className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded transition duration-200"
+            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-white dark:hover:text-slate-800 hover:bg-brand-navy rounded transition duration-200 cursor-pointer"
           >
             <Download size={14} />
           </button>
@@ -99,7 +99,7 @@ export const LogTerminal: React.FC<LogTerminalProps> = ({ title, content, maxHei
       </div>
 
       {/* Terminal Console Output */}
-      <div className={`p-4 overflow-y-auto ${maxHeight} text-left flex flex-col scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent bg-slate-950/90 backdrop-blur-sm`}>
+      <div className={`p-4 overflow-y-auto ${maxHeight} text-left flex flex-col scrollbar-thin scrollbar-thumb-brand-navy-light scrollbar-track-transparent bg-brand-navy`}>
         {lines.map((line, idx) => highlightLine(line, idx))}
       </div>
     </div>
