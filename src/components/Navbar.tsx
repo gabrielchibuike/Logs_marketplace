@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Home, Database, Cpu, LayoutDashboard, ShoppingCart, Trash2, ShieldCheck, Menu, X, CreditCard, LogOut, User, Shield, Sun, Moon } from 'lucide-react';
+import { Home, Database, Cpu, LayoutDashboard, ShoppingCart, Trash2, Menu, X, CreditCard, LogOut, User, Shield, Sun, Moon } from 'lucide-react';
 import type { Product } from '../data/products';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
@@ -46,9 +46,9 @@ export const Navbar: React.FC = () => {
 
   const handleLogOut = () => {
     signOut();
-    localStorage.removeItem('paidlogstore_user');
-    localStorage.removeItem('paidlogstore_purchases');
-    localStorage.removeItem('paidlogstore_cart');
+    localStorage.removeItem('n_logs_user');
+    localStorage.removeItem('n_logs_purchases');
+    localStorage.removeItem('n_logs_cart');
     showToast('Signed out of session.', 'info');
     navigate('/');
   };
@@ -68,12 +68,11 @@ export const Navbar: React.FC = () => {
         to="/"
         className="flex items-center gap-2 cursor-pointer select-none group"
       >
-        <div className="p-1.5 rounded bg-brand-navy/5 border border-brand-border text-brand-navy transition duration-300">
-          <ShieldCheck className="text-brand-red w-5 h-5 group-hover:rotate-3 transition-transform" />
-        </div>
-        <span className="font-sans font-extrabold text-base tracking-wider text-brand-navy uppercase">
-          Paid<span className="text-brand-red">Log</span>Store
-        </span>
+        <img
+          src="/logo.png"
+          alt="N_Logs"
+          className="h-16 w-auto object-contain rounded transition-transform duration-300 group-hover:scale-105"
+        />
       </Link>
 
       {/* Desktop Navigation */}
