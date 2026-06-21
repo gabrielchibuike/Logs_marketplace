@@ -29,6 +29,7 @@ interface AppContextType {
   signUp: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  resetPasswordForEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
 }
@@ -369,6 +370,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // navigate('/');
   };
 
+  const resetPasswordForEmail = async (email: string) => {
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Database connection offline. Auth operations unavailable.' };
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      showToast('Password reset link sent to your email.', 'success');
+      return { success: true };
+    } catch (err: any) {
+      showToast(err.message || 'Failed to send reset link.', 'error');
+      return { success: false, error: err.message };
+    }
+  };
+
 
   return (
     <AppContext.Provider value={{
@@ -391,6 +409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       signUp,
       signIn,
       signOut,
+      resetPasswordForEmail,
       theme,
       toggleTheme
     }}>

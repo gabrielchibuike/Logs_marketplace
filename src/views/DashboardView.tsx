@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Product } from '../data/products';
 import { LogTerminal } from '../components/LogTerminal';
-import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck, Settings } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useNavigate } from 'react-router-dom';
 import { decryptText } from '../utils/crypto';
@@ -10,6 +10,7 @@ import { decryptText } from '../utils/crypto';
 export const DashboardView: React.FC = () => {
   const { purchases, products, user, setAuthModalOpen } = useApp();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'logs' | 'transactions' | 'settings'>('logs');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [disputedIds, setDisputedIds] = useState<string[]>([]);
@@ -19,6 +20,13 @@ export const DashboardView: React.FC = () => {
   const [loadingCreds, setLoadingCreds] = useState<boolean>(false);
   const [txList, setTxList] = useState<any[]>([]);
   const [loadingTxs, setLoadingTxs] = useState<boolean>(false);
+
+  // Settings form states
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsSuccess, setSettingsSuccess] = useState('');
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   if (!user) {
     return (
@@ -106,6 +114,37 @@ export const DashboardView: React.FC = () => {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsError('');
+    setSettingsSuccess('');
+
+    if (newPassword.length < 6) {
+      setSettingsError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setSettingsError('Passwords do not match.');
+      return;
+    }
+
+    setSettingsLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      if (error) throw error;
+      setSettingsSuccess('Password updated successfully!');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err: any) {
+      setSettingsError(err.message || 'Failed to change password.');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
   const filteredLedger = txList.filter((tx) =>
     (tx.payment_reference || '').toLowerCase().includes(ledgerSearch.toLowerCase()) ||
     tx.type.toLowerCase().includes(ledgerSearch.toLowerCase())
@@ -169,173 +208,307 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sidebar */}
-        <div className="lg:col-span-1 bg-brand-card rounded-md p-5 border border-brand-border flex flex-col max-h-[500px]">
-          <h2 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono flex items-center gap-1.5 border-b border-brand-border pb-3 mb-4 text-left">
-            <Key size={16} className="text-brand-red" /> Purchased Accounts
-          </h2>
+      {/* Tab Navigation */}
+      <div className="flex border-b border-brand-border gap-6 pb-0.5">
+        <button
+          onClick={() => {
+            setActiveTab('logs');
+            setSettingsError('');
+            setSettingsSuccess('');
+          }}
+          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${
+            activeTab === 'logs'
+              ? 'border-brand-red text-brand-navy'
+              : 'border-transparent text-brand-muted hover:text-brand-navy'
+          }`}
+        >
+          <Key size={14} /> Accounts & Logs
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('transactions');
+            setSettingsError('');
+            setSettingsSuccess('');
+          }}
+          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${
+            activeTab === 'transactions'
+              ? 'border-brand-red text-brand-navy'
+              : 'border-transparent text-brand-muted hover:text-brand-navy'
+          }`}
+        >
+          <Clock size={14} /> Transaction History
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('settings');
+            setSettingsError('');
+            setSettingsSuccess('');
+          }}
+          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${
+            activeTab === 'settings'
+              ? 'border-brand-red text-brand-navy'
+              : 'border-transparent text-brand-muted hover:text-brand-navy'
+          }`}
+        >
+          <Settings size={14} /> Account Settings
+        </button>
+      </div>
 
-          {purchasedProducts.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center space-y-3">
-              <ShieldCheck size={32} className="text-brand-muted animate-pulse" />
-              <div>
-                <p className="text-xs font-semibold text-brand-navy">No Accounts Purchased</p>
-                <p className="text-[10px] text-brand-muted mt-1 max-w-[200px] mx-auto">
-                  Buy accounts from the marketplace to view full credentials here.
-                </p>
+      {/* Tab Contents */}
+      {activeTab === 'logs' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Sidebar */}
+          <div className="lg:col-span-1 bg-brand-card rounded-md p-5 border border-brand-border flex flex-col max-h-[500px]">
+            <h2 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono flex items-center gap-1.5 border-b border-brand-border pb-3 mb-4 text-left">
+              <Key size={16} className="text-brand-red" /> Purchased Accounts
+            </h2>
+
+            {purchasedProducts.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-10 text-center space-y-3">
+                <ShieldCheck size={32} className="text-brand-muted animate-pulse" />
+                <div>
+                  <p className="text-xs font-semibold text-brand-navy">No Accounts Purchased</p>
+                  <p className="text-[10px] text-brand-muted mt-1 max-w-[200px] mx-auto">
+                    Buy accounts from the marketplace to view full credentials here.
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-              {purchasedProducts.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedProduct(p)}
-                  className={`w-full p-3 rounded-md border text-left transition flex items-center justify-between gap-3 group cursor-pointer ${selectedProduct?.id === p.id
-                    ? 'bg-brand-navy/5 border-brand-navy text-brand-navy font-semibold'
-                    : 'bg-brand-card border-brand-border text-brand-text hover:bg-brand-bg hover:text-brand-navy'
-                    }`}
-                >
-                  <div className="overflow-hidden">
-                    <p className="text-xs font-semibold truncate group-hover:text-brand-navy transition">
-                      {getPlatformIcon(p.platform)} {p.title}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1 font-mono text-[9px] text-brand-muted">
-                      <span>{p.platform}</span>
-                      <span>•</span>
-                      <span>{formatFollowers(p.followers)} followers</span>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                {purchasedProducts.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedProduct(p)}
+                    className={`w-full p-3 rounded-md border text-left transition flex items-center justify-between gap-3 group cursor-pointer ${selectedProduct?.id === p.id
+                      ? 'bg-brand-navy/5 border-brand-navy text-brand-navy font-semibold'
+                      : 'bg-brand-card border-brand-border text-brand-text hover:bg-brand-bg hover:text-brand-navy'
+                      }`}
+                  >
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-semibold truncate group-hover:text-brand-navy transition">
+                        {getPlatformIcon(p.platform)} {p.title}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1 font-mono text-[9px] text-brand-muted">
+                        <span>{p.platform}</span>
+                        <span>•</span>
+                        <span>{formatFollowers(p.followers)} followers</span>
+                      </div>
+                    </div>
+                    <Eye size={14} className={`shrink-0 ${selectedProduct?.id === p.id ? 'text-brand-navy' : 'text-brand-muted group-hover:text-brand-navy'}`} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Credentials Viewer */}
+          <div className="lg:col-span-2 flex flex-col justify-between h-full min-h-[400px]">
+            {selectedProduct ? (
+              <div className="flex flex-col h-full justify-between">
+                {loadingCreds ? (
+                  <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-brand-border rounded-md bg-brand-card text-center gap-2 text-xs font-mono text-brand-navy">
+                    <div className="w-5 h-5 rounded-full border-2 border-brand-navy/20 border-t-brand-navy animate-spin"></div>
+                    <span>Decrypting secure digital assets...</span>
+                  </div>
+                ) : (
+                  <LogTerminal
+                    title={`${selectedProduct.id}_credentials.txt`}
+                    content={credentials}
+                    maxHeight="max-h-[420px]"
+                  />
+                )}
+
+                {/* Buyer Protection Control Panel */}
+                <div className="mt-3 p-4 rounded-md bg-brand-card border border-brand-border flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                  <div className="flex items-start gap-2.5">
+                    <div className={`p-2 rounded-md border ${disputedIds.includes(selectedProduct.id)
+                      ? 'bg-rose-50 border-rose-200 text-brand-red'
+                      : 'bg-brand-navy/5 border border-brand-navy/10 text-brand-navy'
+                      }`}>
+                      <ShieldCheck size={16} className="animate-pulse" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-brand-muted font-mono block">EXCLUSIVITY GUARANTEE</span>
+                      <span className={`text-xs font-semibold block ${disputedIds.includes(selectedProduct.id) ? 'text-brand-red' : 'text-brand-navy'}`}>
+                        {disputedIds.includes(selectedProduct.id)
+                          ? '🚨 TRANSACTION DISPUTED (Admin Alerted)'
+                          : '🛡️ 72-Hour Buyer Protection: Active'}
+                      </span>
+                      <span className="text-[9px] text-brand-muted font-mono block mt-0.5">
+                        {disputedIds.includes(selectedProduct.id)
+                          ? 'Funds frozen. Auditing seller credential logs.'
+                          : 'Expires in: 71h 59m'}
+                      </span>
                     </div>
                   </div>
-                  <Eye size={14} className={`shrink-0 ${selectedProduct?.id === p.id ? 'text-brand-navy' : 'text-brand-muted group-hover:text-brand-navy'}`} />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Credentials Viewer */}
-        <div className="lg:col-span-2 flex flex-col justify-between h-full min-h-[400px]">
-          {selectedProduct ? (
-            <div className="flex flex-col h-full justify-between">
-              {loadingCreds ? (
-                <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-brand-border rounded-md bg-brand-card text-center gap-2 text-xs font-mono text-brand-navy">
-                  <div className="w-5 h-5 rounded-full border-2 border-brand-navy/20 border-t-brand-navy animate-spin"></div>
-                  <span>Decrypting secure digital assets...</span>
+                  {!disputedIds.includes(selectedProduct.id) && (
+                    <button
+                      onClick={() => handleRaiseDispute(selectedProduct.id)}
+                      className="px-3 py-1.5 rounded-md border border-brand-red text-brand-red hover:bg-brand-red/5 text-[10px] font-mono font-semibold transition cursor-pointer shrink-0"
+                    >
+                      Raise Dispute
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <LogTerminal
-                  title={`${selectedProduct.id}_credentials.txt`}
-                  content={credentials}
-                  maxHeight="max-h-[420px]"
-                />
-              )}
 
-              {/* Buyer Protection Control Panel */}
-              <div className="mt-3 p-4 rounded-md bg-brand-card border border-brand-border flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
-                <div className="flex items-start gap-2.5">
-                  <div className={`p-2 rounded-md border ${disputedIds.includes(selectedProduct.id)
-                    ? 'bg-rose-50 border-rose-200 text-brand-red'
-                    : 'bg-brand-navy/5 border border-brand-navy/10 text-brand-navy'
-                    }`}>
-                    <ShieldCheck size={16} className="animate-pulse" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-brand-muted font-mono block">EXCLUSIVITY GUARANTEE</span>
-                    <span className={`text-xs font-semibold block ${disputedIds.includes(selectedProduct.id) ? 'text-brand-red' : 'text-brand-navy'}`}>
-                      {disputedIds.includes(selectedProduct.id)
-                        ? '🚨 TRANSACTION DISPUTED (Admin Alerted)'
-                        : '🛡️ 72-Hour Buyer Protection: Active'}
-                    </span>
-                    <span className="text-[9px] text-brand-muted font-mono block mt-0.5">
-                      {disputedIds.includes(selectedProduct.id)
-                        ? 'Funds frozen. Auditing seller credential logs.'
-                        : 'Expires in: 71h 59m'}
-                    </span>
-                  </div>
-                </div>
-                {!disputedIds.includes(selectedProduct.id) && (
-                  <button
-                    onClick={() => handleRaiseDispute(selectedProduct.id)}
-                    className="px-3 py-1.5 rounded-md border border-brand-red text-brand-red hover:bg-brand-red/5 text-[10px] font-mono font-semibold transition cursor-pointer shrink-0"
-                  >
-                    Raise Dispute
-                  </button>
-                )}
+                <p className="text-[10px] text-brand-muted font-mono text-left mt-2.5">
+                  ⚠ Keep credentials secure. Change passwords and recovery emails immediately after transfer.
+                </p>
               </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-brand-border rounded-md bg-brand-card py-20 text-center glass">
+                <Key size={48} className="text-brand-muted mb-3 animate-pulse-slow" />
+                <h3 className="text-sm font-semibold text-brand-navy">No Account Selected</h3>
+                <p className="text-xs text-brand-muted max-w-xs mt-1">
+                  Select a purchased account from the left panel to view full credentials.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-              <p className="text-[10px] text-brand-muted font-mono text-left mt-2.5">
-                ⚠ Keep credentials secure. Change passwords and recovery emails immediately after transfer.
-              </p>
+      {activeTab === 'transactions' && (
+        <div className="bg-brand-card rounded-md p-5 border border-brand-border">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-brand-border pb-3 mb-4">
+            <h2 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono flex items-center gap-1.5 text-left">
+              <Clock size={16} className="text-brand-red" /> Transaction History
+            </h2>
+            <div className="relative w-full sm:w-60">
+              <Search className="absolute left-2.5 top-2 text-brand-muted w-3.5 h-3.5" />
+              <input
+                type="text"
+                placeholder="Filter transactions..."
+                value={ledgerSearch}
+                onChange={(e) => setLedgerSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1 bg-brand-bg border border-brand-border rounded-md text-[10px] font-mono text-brand-text focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy"
+              />
+            </div>
+          </div>
+
+          {loadingTxs ? (
+            <div className="py-8 text-center text-xs text-brand-muted font-mono">
+              Loading transaction ledger...
+            </div>
+          ) : filteredLedger.length === 0 ? (
+            <div className="py-8 text-center text-xs text-brand-muted font-mono">
+              No transactions found.
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-brand-border rounded-md bg-brand-card py-20 text-center glass">
-              <Key size={48} className="text-brand-muted mb-3 animate-pulse-slow" />
-              <h3 className="text-sm font-semibold text-brand-navy">No Account Selected</h3>
-              <p className="text-xs text-brand-muted max-w-xs mt-1">
-                Select a purchased account from the left panel to view full credentials.
-              </p>
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left font-mono text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-brand-border text-brand-muted select-none">
+                    <th className="py-2.5 px-3 font-semibold">Date</th>
+                    <th className="py-2.5 px-3 font-semibold">ID</th>
+                    <th className="py-2.5 px-3 font-semibold">Description</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLedger.map((tx) => (
+                    <tr key={tx.id} className="border-b border-brand-border hover:bg-brand-bg/60 transition">
+                      <td className="py-3 px-3 text-brand-muted text-left">
+                        {new Date(tx.created_at).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-3 text-brand-navy font-semibold text-left">{tx.id}</td>
+                      <td className="py-3 px-3 text-brand-text text-left">{tx.payment_reference || 'Purchase receipt'}</td>
+                      <td className="py-3 px-3 text-right font-bold text-brand-navy">
+                        ₦{parseFloat(tx.amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Transaction Ledger */}
-      <div className="bg-brand-card rounded-md p-5 border border-brand-border">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-brand-border pb-3 mb-4">
-          <h2 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono flex items-center gap-1.5 text-left">
-            <Clock size={16} className="text-brand-red" /> Transaction History
-          </h2>
-          <div className="relative w-full sm:w-60">
-            <Search className="absolute left-2.5 top-2 text-brand-muted w-3.5 h-3.5" />
-            <input
-              type="text"
-              placeholder="Filter transactions..."
-              value={ledgerSearch}
-              onChange={(e) => setLedgerSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1 bg-brand-bg border border-brand-border rounded-md text-[10px] font-mono text-brand-text focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy"
-            />
+      {activeTab === 'settings' && (
+        <div className="bg-brand-card rounded-md p-6 border border-brand-border text-left space-y-6">
+          <div className="border-b border-brand-border pb-4">
+            <h2 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <Settings size={16} className="text-brand-red" /> Account Settings
+            </h2>
+            <p className="text-xs text-brand-muted mt-1 font-sans">Manage your account profile and credentials.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Profile Info */}
+            <div className="p-4 rounded-md bg-brand-bg border border-brand-border space-y-4">
+              <h3 className="text-xs font-bold text-brand-navy uppercase tracking-wide border-b border-brand-border pb-2 font-sans">Profile Details</h3>
+              <div className="space-y-3 font-mono text-xs">
+                <div>
+                  <span className="text-[10px] text-brand-muted block font-sans">EMAIL ADDRESS</span>
+                  <span className="text-brand-navy font-semibold">{user?.email || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-brand-muted block font-sans">ACCOUNT ID</span>
+                  <span className="text-brand-navy font-semibold">{user?.id || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-brand-muted block font-sans">ACCOUNT CREATED</span>
+                  <span className="text-brand-navy font-semibold">
+                    {user?.created_at ? new Date(user.created_at).toLocaleString() : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Change Password Form */}
+            <div className="p-4 rounded-md border border-brand-border bg-brand-card space-y-4">
+              <h3 className="text-xs font-bold text-brand-navy uppercase tracking-wide border-b border-brand-border pb-2 font-sans">Change Password</h3>
+
+              {settingsError && (
+                <div className="p-3 rounded bg-red-50 border border-red-200 text-brand-red text-xs font-mono">
+                  {settingsError}
+                </div>
+              )}
+
+              {settingsSuccess && (
+                <div className="p-3 rounded bg-emerald-50 border border-emerald-200 text-emerald-600 text-xs font-mono dark:bg-emerald-950/40 dark:text-emerald-400">
+                  ✓ {settingsSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleChangePassword} className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-brand-muted uppercase font-bold tracking-wider block font-sans">New Password</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={settingsLoading}
+                    className="w-full px-3 py-2 text-xs rounded bg-brand-bg border border-brand-border text-brand-navy focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 transition disabled:opacity-50"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-brand-muted uppercase font-bold tracking-wider block font-sans">Confirm New Password</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    disabled={settingsLoading}
+                    className="w-full px-3 py-2 text-xs rounded bg-brand-bg border border-brand-border text-brand-navy focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 transition disabled:opacity-50"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={settingsLoading}
+                  className="w-full py-2 px-4 rounded bg-brand-red hover:bg-brand-red-hover text-white text-xs font-bold font-mono transition duration-200 disabled:opacity-50 cursor-pointer border-0"
+                >
+                  {settingsLoading ? 'Saving...' : 'Save New Password'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
-
-        {loadingTxs ? (
-          <div className="py-8 text-center text-xs text-brand-muted font-mono">
-            Loading transaction ledger...
-          </div>
-        ) : filteredLedger.length === 0 ? (
-          <div className="py-8 text-center text-xs text-brand-muted font-mono">
-            No transactions found.
-          </div>
-        ) : (
-          <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left font-mono text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-brand-border text-brand-muted select-none">
-                  <th className="py-2.5 px-3 font-semibold">Date</th>
-                  <th className="py-2.5 px-3 font-semibold">ID</th>
-                  <th className="py-2.5 px-3 font-semibold">Description</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLedger.map((tx) => (
-                  <tr key={tx.id} className="border-b border-brand-border hover:bg-brand-bg/60 transition">
-                    <td className="py-3 px-3 text-brand-muted text-left">
-                      {new Date(tx.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-3 text-brand-navy font-semibold text-left">{tx.id}</td>
-                    <td className="py-3 px-3 text-brand-text text-left">{tx.payment_reference || 'Purchase receipt'}</td>
-                    <td className="py-3 px-3 text-right font-bold text-brand-navy">
-                      ₦{parseFloat(tx.amount).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };

@@ -46,16 +46,16 @@ export const Footer: React.FC = () => {
           <h4 className="text-xs font-bold uppercase tracking-wider text-brand-navy font-sans">Legal & Policies</h4>
           <ul className="space-y-2 text-xs">
             <li>
-              <a href="#" className="text-brand-muted hover:text-brand-red transition">Terms of Service</a>
+              <Link to="/terms" className="text-brand-muted hover:text-brand-red transition">Terms of Service</Link>
             </li>
             <li>
-              <a href="#" className="text-brand-muted hover:text-brand-red transition">Privacy Policy</a>
+              <Link to="/privacy" className="text-brand-muted hover:text-brand-red transition">Privacy Policy</Link>
             </li>
             <li>
-              <a href="#" className="text-brand-muted hover:text-brand-red transition">Buyer Escrow Rules</a>
+              <Link to="/escrow-rules" className="text-brand-muted hover:text-brand-red transition">Buyer Escrow Rules</Link>
             </li>
             <li>
-              <a href="#" className="text-brand-muted hover:text-brand-red transition">Dispute Resolution</a>
+              <Link to="/dispute-resolution" className="text-brand-muted hover:text-brand-red transition">Dispute Resolution</Link>
             </li>
           </ul>
         </div>
