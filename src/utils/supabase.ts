@@ -11,6 +11,9 @@ if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
 if (!supabasePublishableKey) missingVars.push('VITE_SUPABASE_PUBLISHABLE_KEY');
 if (!paystackKey) missingVars.push('VITE_PAYSTACK_PUBLIC_KEY');
 
+console.log(supabaseUrl, supabasePublishableKey, paystackKey, "environment variables");
+
+
 if (missingVars.length > 0) {
   const errorMsg = `🚨 PRODUCTION ERROR: Missing critical environment variables: ${missingVars.join(', ')}. Ensure they are configured in your environment or .env file.`;
   console.error(errorMsg);
