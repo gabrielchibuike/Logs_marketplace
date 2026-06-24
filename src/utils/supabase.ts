@@ -11,7 +11,7 @@ if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
 if (!supabasePublishableKey) missingVars.push('VITE_SUPABASE_PUBLISHABLE_KEY');
 if (!paystackKey) missingVars.push('VITE_PAYSTACK_PUBLIC_KEY');
 
-console.log(supabaseUrl, supabasePublishableKey, paystackKey, "environment variables");
+console.log(supabaseUrl, supabasePublishableKey, paystackKey, "environment variablesss");
 
 
 if (missingVars.length > 0) {
