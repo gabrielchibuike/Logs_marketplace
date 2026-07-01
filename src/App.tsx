@@ -12,6 +12,7 @@ import { PrivacyView } from './views/PrivacyView'
 import { EscrowRulesView } from './views/EscrowRulesView'
 import { DisputeResolutionView } from './views/DisputeResolutionView'
 import { ResetPasswordView } from './views/ResetPasswordView'
+import { AuthCallbackView } from './views/AuthCallbackView'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 
 function AppContent() {
@@ -30,6 +31,7 @@ function AppContent() {
           <Route path="/escrow-rules" element={<EscrowRulesView />} />
           <Route path="/dispute-resolution" element={<DisputeResolutionView />} />
           <Route path="/reset-password" element={<ResetPasswordView />} />
+          <Route path="/auth/callback" element={<AuthCallbackView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

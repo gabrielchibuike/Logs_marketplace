@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Product } from '../data/products';
 import { LogTerminal } from '../components/LogTerminal';
-import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck, Settings, Lock, ShieldAlert } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useNavigate } from 'react-router-dom';
 import { decryptText } from '../utils/crypto';
@@ -63,6 +63,11 @@ export const DashboardView: React.FC = () => {
   // Fetch selected product credentials
   useEffect(() => {
     if (selectedProduct && user) {
+      if (!user.email_confirmed_at) {
+        setCredentials('Email verification required.');
+        setLoadingCreds(false);
+        return;
+      }
       const fetchCreds = async () => {
         setLoadingCreds(true);
         try {
@@ -185,6 +190,43 @@ export const DashboardView: React.FC = () => {
         </button>
       </div>
 
+      {/* Verify Email Alert Banner */}
+      {!user?.email_confirmed_at && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-400 p-4 rounded-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left glass">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 animate-pulse">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold font-mono uppercase tracking-wider">Email Verification Pending</h4>
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1 max-w-2xl leading-relaxed">
+                Your email address <strong className="font-mono">{user?.email}</strong> is not verified yet. Decryption of sensitive account credentials is locked until verification is complete.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                const { error } = await supabase.auth.resend({
+                  type: 'signup',
+                  email: user.email!,
+                  options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback`
+                  }
+                });
+                if (error) throw error;
+                alert('A new verification email has been sent to your inbox!');
+              } catch (err: any) {
+                alert('Failed to resend verification email: ' + err.message);
+              }
+            }}
+            className="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold font-mono text-[9px] uppercase transition cursor-pointer border-0 shrink-0 select-none shadow-sm"
+          >
+            Resend Verification Link
+          </button>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="p-4 rounded-md bg-brand-card border border-brand-border glass flex items-center justify-between">
@@ -305,7 +347,19 @@ export const DashboardView: React.FC = () => {
           <div className="lg:col-span-2 flex flex-col justify-between h-full min-h-[400px]">
             {selectedProduct ? (
               <div className="flex flex-col h-full justify-between">
-                {loadingCreds ? (
+                {!user?.email_confirmed_at ? (
+                  <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-brand-border rounded-md bg-brand-card text-center p-6 gap-4 glass">
+                    <div className="w-14 h-14 rounded-full bg-brand-red/10 border border-brand-red/20 flex items-center justify-center text-brand-red animate-pulse">
+                      <Lock size={24} />
+                    </div>
+                    <div className="space-y-2 max-w-sm">
+                      <h3 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono">Credentials Securely Locked</h3>
+                      <p className="text-xs text-brand-muted leading-relaxed">
+                        To access this account's passwords, login tokens, and recovery keys, you must first verify your email address. Check your inbox for the activation link.
+                      </p>
+                    </div>
+                  </div>
+                ) : loadingCreds ? (
                   <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-brand-border rounded-md bg-brand-card text-center gap-2 text-xs font-mono text-brand-navy">
                     <div className="w-5 h-5 rounded-full border-2 border-brand-navy/20 border-t-brand-navy animate-spin"></div>
                     <span>Decrypting secure digital assets...</span>

@@ -26,7 +26,7 @@ interface AppContextType {
   clearCart: () => void;
   completePayment: (productId: string, reference: string) => Promise<{ success: boolean; error?: string }>;
   hasPurchased: (id: string) => boolean;
-  signUp: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, pass: string) => Promise<{ success: boolean; error?: string; emailConfirmationRequired?: boolean }>;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -322,23 +322,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // --- AUTH SERVICES (SUPABASE) ---
-  const signUp = async (email: string, pass: string) => {
+  const signUp = async (email: string, pass: string): Promise<{ success: boolean; error?: string; emailConfirmationRequired?: boolean }> => {
     if (!isSupabaseConfigured()) {
       return { success: false, error: 'Database connection offline. Auth operations unavailable.' };
     }
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password: pass,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             role: 'buyer'
           }
         }
       });
       if (error) throw error;
-      showToast('Account created successfully! Verify your email to sign in.', 'success');
-      return { success: true };
+
+      const emailConfirmationRequired = data.user !== null && data.session === null;
+      if (emailConfirmationRequired) {
+        showToast('Account created successfully! Please check your email to confirm.', 'success');
+        return { success: true, emailConfirmationRequired: true };
+      }
+
+      showToast('Account created successfully!', 'success');
+      return { success: true, emailConfirmationRequired: false };
     } catch (err: any) {
       showToast(err.message || 'Failed to register account.', 'error');
       return { success: false, error: err.message };

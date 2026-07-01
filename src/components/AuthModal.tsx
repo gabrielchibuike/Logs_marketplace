@@ -48,21 +48,28 @@ export const AuthModal: React.FC = () => {
     }
     setAuthLoading(true);
     try {
-      const res = authTab === 'login'
-        ? await signIn(email, password)
-        : await signUp(email, password);
-
-      if (!res.success) {
-        setAuthError(res.error || 'Authentication failed');
-      } else {
-        if (authTab === 'signup') {
-          setAuthTab('login');
-          setPassword('');
+      if (authTab === 'login') {
+        const res = await signIn(email, password);
+        if (!res.success) {
+          setAuthError(res.error || 'Authentication failed');
         } else {
           setAuthModalOpen(false);
           setEmail('');
           setPassword('');
           navigate('/');
+        }
+      } else {
+        const res = await signUp(email, password);
+        if (!res.success) {
+          setAuthError(res.error || 'Authentication failed');
+        } else {
+          if (res.emailConfirmationRequired) {
+            setAuthSuccess('Registration successful! Please check your email inbox to confirm your account before signing in.');
+          } else {
+            setAuthSuccess('Registration successful! You can now log in.');
+          }
+          setAuthTab('login');
+          setPassword('');
         }
       }
     } catch (err: any) {
