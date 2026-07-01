@@ -104,7 +104,7 @@ export const CatalogView: React.FC = () => {
         <div className="p-5 rounded bg-amber-50 border border-amber-200 text-left space-y-3 font-mono text-amber-800">
           <div className="flex items-center gap-2 font-bold text-sm">
             <ShieldCheck size={18} />
-            <span>DATABASE INVENTORY EMPTY</span>
+            <span>NO ASSETS AVAILABLE AT THE MOMENT</span>
           </div>
           {/* <p classNamze="text-xs text-brand-navy leading-relaxed font-sans">
             Supabase is successfully synced, but the products table contains zero rows.

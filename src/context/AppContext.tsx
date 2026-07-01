@@ -24,7 +24,7 @@ interface AppContextType {
   addToCart: (id: string) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
-  completePayment: (productId: string, reference: string) => Promise<{ success: boolean; error?: string }>;
+  completePayment: (productId: string, reference: string, quantity?: number) => Promise<{ success: boolean; error?: string }>;
   hasPurchased: (id: string) => boolean;
   signUp: (email: string, pass: string) => Promise<{ success: boolean; error?: string; emailConfirmationRequired?: boolean }>;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
@@ -142,7 +142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setDbError(null);
         const { data, error } = await supabase
           .from('products')
-          .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data')
+          .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data, quantity_total, quantity_available')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -164,6 +164,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             niche: item.niche || '',
             tags: Array.isArray(item.tags) ? item.tags : [],
             sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
+            quantityTotal: item.quantity_total !== undefined ? item.quantity_total : 1,
+            quantityAvailable: item.quantity_available !== undefined ? item.quantity_available : 1,
             fullDataContent: '' // Protected credentials column not loaded on catalog fetch
           }));
           setProducts(formatted);
@@ -252,7 +254,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart([]);
   };
 
-  const completePayment = async (productId: string, reference: string) => {
+  const completePayment = async (productId: string, reference: string, quantity: number = 1) => {
     if (!user) {
       showToast('You must be signed in to complete purchase.', 'error');
       return { success: false, error: 'Authentication required' };
@@ -274,7 +276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       try {
         const { error } = await supabase.functions.invoke('verify-payment', {
-          body: { productId, reference }
+          body: { productId, reference, quantity }
         });
         if (error) throw error;
         success = true;
@@ -283,11 +285,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'Edge function verify-payment failed or not deployed. Falling back to client-side RPC verification (SECURITY WARNING: Client-side tampering is possible in this fallback route).',
           edgeErr
         );
-        // Fallback to direct client RPC call (which uses complete_checkout)
-        const { data, error } = await supabase.rpc('complete_checkout', {
-          product_id_param: productId,
-          reference_param: reference
-        });
+        // Route: single unit → complete_checkout, multi → complete_checkout_multi
+        const rpcName = quantity > 1 ? 'complete_checkout_multi' : 'complete_checkout';
+        const rpcParams = quantity > 1
+          ? { product_id_param: productId, reference_param: reference, quantity_param: quantity }
+          : { product_id_param: productId, reference_param: reference };
+
+        const { data, error } = await supabase.rpc(rpcName, rpcParams);
         if (error) {
           errorMsg = error.message;
           throw error;

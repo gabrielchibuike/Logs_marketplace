@@ -278,3 +278,17 @@ TRANSFER NOTES
   • DO NOT remove verification badge during transfer process',
     'active'
 );
+
+-- ========================================================
+-- SEED PRODUCT CREDENTIALS (Quantity Support Migration)
+-- ========================================================
+
+-- Populate credentials table for seeded products if not already seeded
+INSERT INTO public.product_credentials (product_id, encrypted_credentials)
+SELECT id, encrypted_credentials
+FROM public.products p
+WHERE p.encrypted_credentials IS NOT NULL
+AND NOT EXISTS (
+    SELECT 1 FROM public.product_credentials pc
+    WHERE pc.product_id = p.id
+);

@@ -43,9 +43,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
   const navigate = useNavigate();
   const [decryptedCredentials, setDecryptedCredentials] = useState<string>('');
   const [loadingCredentials, setLoadingCredentials] = useState<boolean>(false);
+  const [buyQty, setBuyQty] = useState<number>(1);
 
   const isPurchased = purchases.includes(product.id);
   const isInCart = cart.includes(product.id);
+  const isOutOfStock = product.quantityAvailable === 0 && !isPurchased;
+  const maxQty = product.quantityAvailable;
+  const isMultiUnit = maxQty > 1;
 
   const accountAge = product.accountAgeDays >= 365
     ? `${Math.floor(product.accountAgeDays / 365)} year(s)`
@@ -60,8 +64,22 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
             product_id_param: product.id
           });
           if (error) throw error;
-          const decrypted = data ? await decryptText(data) : 'No access credentials returned.';
-          setDecryptedCredentials(decrypted);
+          if (Array.isArray(data)) {
+            // New format: JSONB array of encrypted strings
+            const decryptedParts = await Promise.all(
+              data.map(async (encStr: string, i: number) => {
+                const text = await decryptText(encStr);
+                return data.length > 1 ? `─── UNIT ${i + 1} ───\n${text}` : text;
+              })
+            );
+            setDecryptedCredentials(decryptedParts.join('\n\n'));
+          } else if (data) {
+            // Legacy single string fallback
+            const decrypted = await decryptText(data);
+            setDecryptedCredentials(decrypted);
+          } else {
+            setDecryptedCredentials('No access credentials returned.');
+          }
         } catch (err: any) {
           console.error('Error fetching credentials:', err);
           setDecryptedCredentials('Error loading access credentials: ' + err.message);
@@ -78,14 +96,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
       setAuthModalOpen(true);
       return;
     }
+    if (isOutOfStock) {
+      showToast('This listing is sold out.', 'error');
+      return;
+    }
 
     try {
       const handler = PaystackPop.setup({
         key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
         email: user.email,
-        amount: Math.round(product.price * 100), // in kobo
+        amount: Math.round(product.price * buyQty * 100), // in kobo, scaled by qty
         callback: async (response: any) => {
-          const res = await completePayment(product.id, response.reference);
+          const res = await completePayment(product.id, response.reference, buyQty);
           if (res.success) {
             onClose();
             navigate('/dashboard');
@@ -150,6 +172,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
               <span className={`text-sm font-extrabold font-mono ${product.verified ? 'text-blue-700' : 'text-brand-navy'}`}>
                 {product.verified ? '✓ Verified' : 'Standard'}
               </span>
+            </div>
+            <div className="p-3 rounded bg-brand-bg border border-brand-border text-left col-span-2 md:col-span-1">
+              <span className="text-[10px] text-brand-muted font-bold font-sans block uppercase tracking-wider">Stock</span>
+              {isOutOfStock ? (
+                <span className="text-sm font-extrabold font-mono text-brand-red">Sold Out</span>
+              ) : (
+                <span className="text-sm font-extrabold font-mono text-emerald-600">
+                  {product.quantityAvailable} / {product.quantityTotal}
+                </span>
+              )}
             </div>
           </div>
 
@@ -231,9 +263,41 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
         <div className="px-6 py-4 border-t border-brand-border bg-brand-bg flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4 text-left w-full sm:w-auto">
             <div>
-              <span className="text-[10px] text-brand-muted font-mono block">PRICE</span>
-              <span className="text-base font-extrabold text-brand-navy font-mono">₦{product.price.toLocaleString()}</span>
+              <span className="text-[10px] text-brand-muted font-mono block">
+                {buyQty > 1 ? `PRICE × ${buyQty} UNITS` : 'PRICE'}
+              </span>
+              <span className="text-base font-extrabold text-brand-navy font-mono">
+                ₦{(product.price * buyQty).toLocaleString()}
+              </span>
+              {buyQty > 1 && (
+                <span className="text-[9px] text-brand-muted font-mono block">
+                  ₦{product.price.toLocaleString()} each
+                </span>
+              )}
             </div>
+
+            {/* Quantity stepper — only shown for multi-unit available listings */}
+            {isMultiUnit && !isPurchased && !isOutOfStock && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-brand-muted font-mono uppercase tracking-widest">Qty</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setBuyQty(q => Math.max(1, q - 1))}
+                    disabled={buyQty <= 1}
+                    className="w-7 h-7 flex items-center justify-center rounded border border-brand-border text-brand-navy font-bold text-sm hover:bg-brand-card disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                  >−</button>
+                  <span className="w-8 text-center text-sm font-bold font-mono text-brand-navy">{buyQty}</span>
+                  <button
+                    type="button"
+                    onClick={() => setBuyQty(q => Math.min(maxQty, q + 1))}
+                    disabled={buyQty >= maxQty}
+                    className="w-7 h-7 flex items-center justify-center rounded border border-brand-border text-brand-navy font-bold text-sm hover:bg-brand-card disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                  >+</button>
+                </div>
+                <span className="text-[9px] text-brand-muted font-mono">{maxQty} available</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
@@ -248,6 +312,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
               <div className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-emerald-550 border border-emerald-600/30 text-white font-bold text-xs">
                 <Check size={14} /> Owned — Unlocked
               </div>
+            ) : isOutOfStock ? (
+              <button
+                disabled
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-brand-border border border-brand-border text-brand-muted font-bold text-xs cursor-not-allowed opacity-60"
+              >
+                <CreditCard size={14} /> Sold Out
+              </button>
             ) : isInCart ? (
               <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
                 <div className="flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-brand-navy/10 border border-brand-border text-brand-navy font-bold text-xs">
@@ -263,9 +334,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
             ) : (
               <>
                 <button
-                  onClick={() => {
-                    addToCart(product.id);
-                  }}
+                  onClick={() => { addToCart(product.id); }}
                   className="w-full sm:w-auto py-2 px-4 rounded border border-brand-navy/20 hover:border-brand-navy text-brand-navy hover:bg-brand-card transition duration-200 font-bold text-xs cursor-pointer bg-transparent"
                 >
                   Add to Cart

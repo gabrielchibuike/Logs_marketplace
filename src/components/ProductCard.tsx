@@ -41,6 +41,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
   const navigate = useNavigate();
 
   const isPurchased = purchases.includes(product.id);
+  const isOutOfStock = product.quantityAvailable === 0 && !isPurchased;
 
   const getCategoryBadge = (cat: string) => {
     switch (cat) {
@@ -60,6 +61,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
   const handlePaystackCheckout = () => {
     if (!user) {
       setAuthModalOpen(true);
+      return;
+    }
+    if (isOutOfStock) {
+      showToast('This listing is sold out.', 'error');
       return;
     }
 
@@ -99,6 +104,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
                 <Shield size={10} /> Verified
               </span>
             )}
+            {isOutOfStock ? (
+              <span className="text-[9px] font-mono px-2 py-0.5 rounded font-bold bg-rose-100 border border-rose-200 text-brand-red">
+                SOLD OUT
+              </span>
+            ) : product.quantityTotal > 1 ? (
+              <span className="text-[9px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
+                {product.quantityAvailable} in stock
+              </span>
+            ) : null}
             <span className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold ${getCategoryBadge(product.category)}`}>
               {product.category}
             </span>
@@ -165,6 +179,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
               className="flex items-center gap-1 py-1.5 px-3 rounded bg-brand-navy/5 border border-brand-navy/20 text-brand-navy hover:bg-brand-navy/10 text-xs font-bold transition duration-200 cursor-pointer"
             >
               <Check size={13} /> Owned
+            </button>
+          ) : isOutOfStock ? (
+            <button
+              disabled
+              className="flex items-center gap-1 py-1.5 px-3 rounded bg-brand-border border border-brand-border text-brand-muted text-xs font-bold cursor-not-allowed opacity-60"
+            >
+              <CreditCard size={13} /> Sold Out
             </button>
           ) : (
             <button

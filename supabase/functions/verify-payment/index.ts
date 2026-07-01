@@ -18,10 +18,18 @@ serve(async (req) => {
   }
 
   try {
-    const { productId, reference } = await req.json()
+    const { productId, reference, quantity = 1 } = await req.json()
 
     if (!productId || !reference) {
       return new Response(JSON.stringify({ error: 'Missing productId or reference' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const qty = parseInt(quantity, 10) || 1
+    if (qty < 1) {
+      return new Response(JSON.stringify({ error: 'Quantity must be at least 1' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -94,8 +102,8 @@ serve(async (req) => {
       })
     }
 
-    // 4. Verify amount match (Paystack uses kobo: price * 100)
-    const expectedKobo = Math.round(product.price * 100)
+    // 4. Verify amount match (Paystack uses kobo: price * quantity * 100)
+    const expectedKobo = Math.round(product.price * qty * 100)
     const paidKobo = paystackData.data.amount
     if (paidKobo !== expectedKobo) {
       return new Response(JSON.stringify({ error: 'Payment amount mismatch' }), {
@@ -105,11 +113,12 @@ serve(async (req) => {
     }
 
     // 5. Complete purchase transaction on the database securely
-    const { data: success, error: checkoutError } = await supabaseAdmin.rpc('complete_checkout_secured', {
-      product_id_param: productId,
-      reference_param: reference,
-      buyer_id_param: user.id
-    })
+    const rpcName = qty > 1 ? 'complete_checkout_secured_multi' : 'complete_checkout_secured'
+    const rpcParams = qty > 1 
+      ? { product_id_param: productId, reference_param: reference, buyer_id_param: user.id, quantity_param: qty }
+      : { product_id_param: productId, reference_param: reference, buyer_id_param: user.id }
+
+    const { data: success, error: checkoutError } = await supabaseAdmin.rpc(rpcName, rpcParams)
 
     if (checkoutError || !success) {
       return new Response(JSON.stringify({ error: checkoutError?.message || 'Failed to complete transaction ledger entry' }), {

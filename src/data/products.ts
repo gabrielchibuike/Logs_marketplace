@@ -18,6 +18,8 @@ export interface Product {
   tags: string[];
   sampleData: Record<string, string>;
   fullDataContent: string;
+  quantityTotal: number;
+  quantityAvailable: number;
 }
 
 export interface Transaction {
@@ -62,6 +64,8 @@ export const mockProducts: Product[] = [
       "Bio": "💪 Helping you build the body & life you want | Collab → fitlifegains@proton.me",
       "Last Active": "2 days ago"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @fitlife.gains     ║
@@ -128,6 +132,8 @@ TRANSFER NOTES
       "2FA Status": "Disabled",
       "Last Active": "Today"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @CryptoPulseX     ║
@@ -195,6 +201,8 @@ TRANSFER NOTES
       "2FA": "Disabled",
       "Last Active": "Today"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @styledbysena      ║
@@ -261,6 +269,8 @@ TRANSFER NOTES
       "Copyright": "0 claims active",
       "OG Email": "Included"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — CHANNEL: GhostFrame Gaming ║
@@ -326,6 +336,8 @@ TRANSFER NOTES
       "OG Email": "Included",
       "2FA": "Disabled"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @theforkdiaries    ║
@@ -389,6 +401,8 @@ TRANSFER NOTES
       "Monetization": "In-stream video ads + affiliate travel links",
       "Admin Email": "Included"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    PAGE CREDENTIALS — Wanderlust World Travel        ║
@@ -454,6 +468,8 @@ TRANSFER NOTES
       "2FA": "Disabled",
       "Notes": "Ideal for rebrand — aged accounts get priority reach from TikTok algo"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @lifewithjordan__  ║
@@ -521,6 +537,8 @@ TRANSFER NOTES
       "OG Email": "Included",
       "2FA": "Disabled (transfer-ready)"
     },
+    quantityTotal: 1,
+    quantityAvailable: 1,
     fullDataContent: `
 ╔══════════════════════════════════════════════════════╗
 ║    ACCOUNT CREDENTIALS — HANDLE: @celebdigest.off.. ║

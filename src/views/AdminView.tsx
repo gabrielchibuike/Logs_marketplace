@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../utils/supabase';
-import { encryptText } from '../utils/crypto';
+import { encryptText, decryptText } from '../utils/crypto';
 import {
   ShieldAlert, ShieldCheck, Plus, Trash2, ToggleLeft, ToggleRight,
-  Package, TrendingUp, Clock, Loader2, AlertTriangle, X
+  Package, TrendingUp, Clock, Loader2, AlertTriangle, X, Edit, Lock
 } from 'lucide-react';
 
 type InventoryTab = 'active' | 'draft' | 'sold';
@@ -17,6 +17,8 @@ interface InventoryProduct {
   price: number;
   followers: number;
   status: string;
+  quantity_total: number;
+  quantity_available: number;
   created_at: string;
 }
 
@@ -50,7 +52,20 @@ export const AdminView: React.FC = () => {
     { key: 'Platform', value: PLATFORMS[0] },
     { key: 'Handle', value: '' }
   ]);
-  const [formCredentials, setFormCredentials] = useState('');
+  const [formQuantity, setFormQuantity] = useState<number>(1);
+  const [formCredentialsList, setFormCredentialsList] = useState<string[]>(['']);
+  const [formBulkPaste, setFormBulkPaste] = useState<string>('');
+  const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
+
+  // Edit listing states
+  const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(null);
+  const [editingCredentials, setEditingCredentials] = useState<{ id: string | null; encrypted_credentials: string; isSold: boolean; buyer_email?: string; cleartext?: string }[]>([]);
+  const [loadingEditCredentials, setLoadingEditCredentials] = useState<boolean>(false);
+  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editBulkPaste, setEditBulkPaste] = useState<string>('');
+  const [editBulkMode, setEditBulkMode] = useState<boolean>(false);
+  const [deletedCredentialIds, setDeletedCredentialIds] = useState<string[]>([]);
+  const [editSubmitting, setEditSubmitting] = useState<boolean>(false);
 
 
   const isAdmin = userProfile?.role === 'admin';
@@ -61,7 +76,7 @@ export const AdminView: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, title, platform, category, price, followers, status, created_at')
+        .select('id, title, platform, category, price, followers, status, created_at, quantity_total, quantity_available')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setInventory(data || []);
@@ -91,6 +106,277 @@ export const AdminView: React.FC = () => {
       return [{ key: 'Platform', value: formPlatform }, ...prev];
     });
   }, [formPlatform]);
+
+  const handleQuantityChange = (newVal: number) => {
+    if (newVal < 1) newVal = 1;
+    setFormQuantity(newVal);
+    setFormCredentialsList((prev) => {
+      const list = [...prev];
+      if (newVal > list.length) {
+        while (list.length < newVal) list.push('');
+      } else if (newVal < list.length) {
+        list.splice(newVal);
+      }
+      return list;
+    });
+  };
+
+  const handleCredentialChange = (idx: number, value: string) => {
+    setFormCredentialsList((prev) => {
+      const list = [...prev];
+      list[idx] = value;
+      return list;
+    });
+  };
+
+  const handleProcessBulkPaste = () => {
+    const separator = formBulkPaste.includes('---') ? '---' : '\n\n';
+    const parts = formBulkPaste
+      .split(separator)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+
+    if (parts.length > 0) {
+      setFormQuantity(parts.length);
+      setFormCredentialsList(parts);
+      showToast(`Processed bulk paste: parsed ${parts.length} credential blocks.`, 'success');
+      setIsBulkMode(false);
+    } else {
+      showToast('Could not identify any valid credential blocks separated by "---" or double newlines.', 'error');
+    }
+  };
+
+  const [editProductForm, setEditProductForm] = useState<any>({});
+
+  const handleStartEdit = async (product: InventoryProduct) => {
+    setEditingProduct(product);
+    setLoadingEditCredentials(true);
+    setDeletedCredentialIds([]);
+    setEditBulkPaste('');
+    setEditBulkMode(false);
+    setEditQuantity(product.quantity_total);
+    setEditProductForm({
+      title: product.title,
+      price: product.price,
+      followers: product.followers,
+      platform: product.platform,
+      category: product.category,
+      description: '',
+      niche: '',
+      tags: [],
+      sample_data: {}
+    });
+
+    try {
+      // Load full product details (description, niche, tags, sample_data)
+      const { data: fullProd, error: prodErr } = await supabase
+        .from('products')
+        .select('description, niche, tags, sample_data')
+        .eq('id', product.id)
+        .single();
+      
+      if (prodErr) throw prodErr;
+      if (fullProd) {
+        setEditProductForm({
+          ...product,
+          description: fullProd.description || '',
+          niche: fullProd.niche || '',
+          tags: Array.isArray(fullProd.tags) ? fullProd.tags.join(', ') : '',
+          sample_data: fullProd.sample_data || {}
+        });
+      }
+
+      // Load product credentials
+      const { data: credsData, error: credsErr } = await supabase.rpc('admin_get_product_credentials', {
+        product_id_param: product.id
+      });
+      if (credsErr) throw credsErr;
+      
+      const decList = await Promise.all((credsData || []).map(async (item: any) => {
+        const clear = await decryptText(item.encrypted_credentials);
+        return {
+          id: item.id,
+          encrypted_credentials: item.encrypted_credentials,
+          isSold: item.is_sold,
+          buyer_email: item.buyer_email,
+          cleartext: clear
+        };
+      }));
+      setEditingCredentials(decList);
+    } catch (err: any) {
+      console.error('Error loading edit credentials:', err);
+      showToast('Error loading credentials: ' + err.message, 'error');
+    } finally {
+      setLoadingEditCredentials(false);
+    }
+  };
+
+  const handleEditQuantityChange = (newVal: number) => {
+    const soldCount = editingCredentials.filter(c => c.isSold).length;
+    if (newVal < soldCount) {
+      showToast(`Cannot set quantity below the number of sold units (${soldCount}).`, 'error');
+      return;
+    }
+    setEditQuantity(newVal);
+    setEditingCredentials((prev) => {
+      const list = [...prev];
+      if (newVal > list.length) {
+        while (list.length < newVal) {
+          list.push({ id: null, encrypted_credentials: '', isSold: false, cleartext: '' });
+        }
+      } else if (newVal < list.length) {
+        const sold = list.filter(c => c.isSold);
+        const unsold = list.filter(c => !c.isSold);
+        const diff = list.length - newVal;
+        const toDeleteIds: string[] = [];
+        let droppedCount = 0;
+        const keptUnsold = [];
+        
+        for (let i = unsold.length - 1; i >= 0; i--) {
+          if (droppedCount < diff) {
+            if (unsold[i].id) {
+              toDeleteIds.push(unsold[i].id as string);
+            }
+            droppedCount++;
+          } else {
+            keptUnsold.unshift(unsold[i]);
+          }
+        }
+        
+        if (toDeleteIds.length > 0) {
+          setDeletedCredentialIds(prevDel => [...prevDel, ...toDeleteIds]);
+        }
+        return [...sold, ...keptUnsold];
+      }
+      return list;
+    });
+  };
+
+  const handleEditCredentialChange = (idx: number, value: string) => {
+    setEditingCredentials((prev) => {
+      const list = [...prev];
+      list[idx] = { ...list[idx], cleartext: value };
+      return list;
+    });
+  };
+
+  const handleEditDeleteUnsold = (idx: number) => {
+    const item = editingCredentials[idx];
+    if (item.isSold) return;
+    if (item.id) {
+      setDeletedCredentialIds(prev => [...prev, item.id as string]);
+    }
+    setEditingCredentials(prev => prev.filter((_, i) => i !== idx));
+    setEditQuantity(prev => prev - 1);
+  };
+
+  const handleEditProcessBulkPaste = () => {
+    const separator = editBulkPaste.includes('---') ? '---' : '\n\n';
+    const parts = editBulkPaste
+      .split(separator)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+
+    if (parts.length > 0) {
+      setEditingCredentials((prev) => {
+        const list = [...prev];
+        parts.forEach((pText) => {
+          list.push({ id: null, encrypted_credentials: '', isSold: false, cleartext: pText });
+        });
+        setEditQuantity(list.length);
+        return list;
+      });
+      showToast(`Added ${parts.length} units from bulk paste.`, 'success');
+      setEditBulkPaste('');
+      setEditBulkMode(false);
+    } else {
+      showToast('No valid credentials blocks found to paste.', 'error');
+    }
+  };
+
+  const handleSaveEditProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    
+    const emptyCreds = editingCredentials.filter(c => !c.cleartext?.trim());
+    if (emptyCreds.length > 0) {
+      showToast('Please fill in credentials for all units.', 'error');
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      // 1. Delete credentials marked for deletion
+      if (deletedCredentialIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from('product_credentials')
+          .delete()
+          .in('id', deletedCredentialIds);
+        if (delErr) throw delErr;
+      }
+
+      // 2. Insert new and update changed credentials
+      for (const cred of editingCredentials) {
+        if (cred.id === null) {
+          const enc = await encryptText(cred.cleartext || '');
+          const { error: insErr } = await supabase
+            .from('product_credentials')
+            .insert([{ product_id: editingProduct.id, encrypted_credentials: enc }]);
+          if (insErr) throw insErr;
+        } else if (!cred.isSold) {
+          const enc = await encryptText(cred.cleartext || '');
+          const { error: updErr } = await supabase
+            .from('product_credentials')
+            .update({ encrypted_credentials: enc })
+            .eq('id', cred.id);
+          if (updErr) throw updErr;
+        }
+      }
+
+      // 3. Update product details
+      const parsedTags = typeof editProductForm.tags === 'string'
+        ? editProductForm.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : editProductForm.tags;
+
+      // Extract sample data keys
+      const sampleDataObj: Record<string, string> = {};
+      if (editProductForm.sample_data) {
+        Object.entries(editProductForm.sample_data).forEach(([k, v]) => {
+          if (k.trim()) sampleDataObj[k.trim()] = v as string;
+        });
+      }
+
+      const { error: prodUpdateErr } = await supabase
+        .from('products')
+        .update({
+          title: editProductForm.title,
+          description: editProductForm.description,
+          platform: editProductForm.platform,
+          category: editProductForm.category,
+          followers: parseInt(editProductForm.followers) || 0,
+          following: parseInt(editProductForm.following) || 0,
+          engagement: parseFloat(editProductForm.engagement) || 0,
+          account_age_days: parseInt(editProductForm.account_age_days) || 0,
+          posts: parseInt(editProductForm.posts) || 0,
+          verified: editProductForm.verified,
+          price: parseFloat(editProductForm.price),
+          niche: editProductForm.niche,
+          tags: parsedTags,
+          sample_data: sampleDataObj
+        })
+        .eq('id', editingProduct.id);
+
+      if (prodUpdateErr) throw prodUpdateErr;
+
+      showToast('Product listing and credentials updated successfully.', 'success');
+      setEditingProduct(null);
+      fetchInventory();
+    } catch (err: any) {
+      showToast('Update failed: ' + err.message, 'error');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
 
   const filteredInventory = inventory.filter((p) => p.status === activeInventoryTab);
 
@@ -144,6 +430,12 @@ export const AdminView: React.FC = () => {
       showToast('Title and Price are required.', 'error');
       return;
     }
+    // Check credentials count matches quantity
+    const nonOk = formCredentialsList.filter(c => !c.trim());
+    if (nonOk.length > 0) {
+      showToast(`Please fill in credentials for all ${formQuantity} units.`, 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       const parsedTags = formTags
@@ -158,28 +450,49 @@ export const AdminView: React.FC = () => {
         }
       });
 
-      const encrypted = await encryptText(formCredentials);
-      const { error } = await supabase.from('products').insert([{
-        title: formTitle,
-        description: formDescription,
-        platform: formPlatform,
-        category: formCategory,
-        followers: parseInt(formFollowers) || 0,
-        following: parseInt(formFollowing) || 0,
-        engagement: parseFloat(formEngagement) || 0,
-        account_age_days: parseInt(formAccountAgeDays) || 0,
-        posts: parseInt(formPosts) || 0,
-        verified: formVerified,
-        price: parseFloat(formPrice),
-        niche: formNiche,
-        tags: parsedTags.length > 0 ? parsedTags : [],
-        sample_data: sampleDataObj,
-        encrypted_credentials: encrypted,
+      // 1. Insert product
+      const { data: newProduct, error: productErr } = await supabase
+        .from('products')
+        .insert([{
+          title: formTitle,
+          description: formDescription,
+          platform: formPlatform,
+          category: formCategory,
+          followers: parseInt(formFollowers) || 0,
+          following: parseInt(formFollowing) || 0,
+          engagement: parseFloat(formEngagement) || 0,
+          account_age_days: parseInt(formAccountAgeDays) || 0,
+          posts: parseInt(formPosts) || 0,
+          verified: formVerified,
+          price: parseFloat(formPrice),
+          niche: formNiche,
+          tags: parsedTags.length > 0 ? parsedTags : [],
+          sample_data: sampleDataObj,
+          encrypted_credentials: await encryptText(formCredentialsList[0]), // Legacy fallback
+          status: 'draft'
+        }])
+        .select('id')
+        .single();
 
-        status: 'draft'
-      }]);
-      if (error) throw error;
-      showToast('New account listing created as Draft.', 'success');
+      if (productErr) throw productErr;
+
+      // 2. Encrypt and insert credentials
+      const encryptedList = await Promise.all(
+        formCredentialsList.map(async (text) => await encryptText(text))
+      );
+
+      const credentialInserts = encryptedList.map((enc) => ({
+        product_id: newProduct.id,
+        encrypted_credentials: enc
+      }));
+
+      const { error: credsErr } = await supabase
+        .from('product_credentials')
+        .insert(credentialInserts);
+
+      if (credsErr) throw credsErr;
+
+      showToast(`New account listing created as Draft with ${formQuantity} credential units.`, 'success');
       // Reset form
       setFormTitle(''); setFormDescription(''); setFormFollowers('');
       setFormFollowing(''); setFormEngagement(''); setFormAccountAgeDays('');
@@ -189,7 +502,10 @@ export const AdminView: React.FC = () => {
         { key: 'Platform', value: formPlatform },
         { key: 'Handle', value: '' }
       ]);
-      setFormCredentials(''); setShowAddForm(false);
+      setFormQuantity(1);
+      setFormCredentialsList(['']);
+      setFormBulkPaste('');
+      setShowAddForm(false);
       fetchInventory();
     } catch (err: any) {
       showToast('Insert failed: ' + err.message, 'error');
@@ -309,8 +625,8 @@ export const AdminView: React.FC = () => {
             <Plus size={16} className="text-brand-red" /> New Account Listing
           </h2>
           <form onSubmit={handleAddProduct} className="space-y-4">
-            {/* ── Row 1: Title & Price ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* ── Row 1: Title, Price & Quantity ── */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Title *</label>
                 <input
@@ -324,6 +640,14 @@ export const AdminView: React.FC = () => {
                 <input
                   type="number" required min="0" step="0.01" value={formPrice} onChange={(e) => setFormPrice(e.target.value)}
                   placeholder="e.g. 279.00"
+                  className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Quantity *</label>
+                <input
+                  type="number" required min="1" value={formQuantity} onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+                  placeholder="e.g. 1"
                   className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
                 />
               </div>
@@ -502,19 +826,58 @@ export const AdminView: React.FC = () => {
               </button>
             </div>
 
-            {/* ── Encrypted Credentials ── */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block flex items-center gap-1">
-                <AlertTriangle size={10} className="text-brand-red" /> Raw Credentials (Secured via RLS)
-              </label>
-              <textarea
-                rows={8} value={formCredentials} onChange={(e) => setFormCredentials(e.target.value)}
-                placeholder={'USERNAME     : CryptoPulseX\nEMAIL        : cryptopulsex.acc@gmail.com\nPASSWORD     : D3F!Market#Pulse22\nOG EMAIL     : cryptopulsex_og@outlook.com\nOG EMAIL PASS: 0riginal_Pulse#99\n\nRECOVERY\n  Phone        : Linked\n  Backup Email : cryptopulsex.backup@proton.me'}
-                className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition resize-none"
-              />
-              <p className="text-[9px] text-brand-muted font-mono">
-                This data is stored in <code>encrypted_credentials</code> and is never visible to buyers until after purchase via the secure RPC.
-              </p>
+            {/* ── Credentials Batch Entry ── */}
+            <div className="space-y-3 p-4 rounded-md bg-brand-bg border border-brand-border">
+              <div className="flex items-center justify-between border-b border-brand-border/60 pb-2">
+                <label className="text-[10px] text-brand-navy uppercase tracking-widest font-mono font-bold flex items-center gap-1.5">
+                  <AlertTriangle size={12} className="text-brand-red" /> Unit Credentials ({formQuantity} total)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsBulkMode(!isBulkMode)}
+                  className="px-2 py-1 rounded border border-brand-border text-[9px] font-bold font-mono text-brand-muted hover:text-brand-navy hover:bg-brand-card transition cursor-pointer"
+                >
+                  {isBulkMode ? 'Show Individual Entries' : 'Use Bulk Paste'}
+                </button>
+              </div>
+
+              {isBulkMode ? (
+                <div className="space-y-2">
+                  <p className="text-[9px] text-brand-muted font-mono leading-relaxed">
+                    Paste credentials for multiple units. Separate each unit using <code>---</code> on a new line, or split with an empty double line.
+                  </p>
+                  <textarea
+                    rows={8}
+                    value={formBulkPaste}
+                    onChange={(e) => setFormBulkPaste(e.target.value)}
+                    placeholder="USERNAME : account1&#10;PASSWORD : pass1&#10;---&#10;USERNAME : account2&#10;PASSWORD : pass2"
+                    className="w-full px-3 py-2 text-xs rounded-md bg-brand-card border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition resize-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleProcessBulkPaste}
+                    className="py-1 px-3 bg-brand-navy text-white dark:text-slate-800 text-[10px] font-mono font-bold rounded hover:bg-brand-navy-light transition cursor-pointer border-0"
+                  >
+                    Process Bulk Paste
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-1 scrollbar-thin">
+                  {formCredentialsList.map((cred, idx) => (
+                    <div key={idx} className="space-y-1.5 text-left bg-brand-card p-3 rounded border border-brand-border/60 font-sans">
+                      <span className="text-[9px] font-bold font-mono text-brand-muted block">UNIT {idx + 1} CREDENTIALS</span>
+                      <textarea
+                        rows={3}
+                        required
+                        value={cred}
+                        onChange={(e) => handleCredentialChange(idx, e.target.value)}
+                        placeholder={`USERNAME     : unit_${idx + 1}_user\nPASSWORD     : pass_${idx + 1}`}
+                        className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <button
@@ -575,6 +938,7 @@ export const AdminView: React.FC = () => {
                     <th className="py-2.5 px-3 font-semibold">Category</th>
                     <th className="py-2.5 px-3 font-semibold text-right">Followers</th>
                     <th className="py-2.5 px-3 font-semibold text-right">Price</th>
+                    <th className="py-2.5 px-3 font-semibold text-center">Stock (Sold / Total)</th>
                     <th className="py-2.5 px-3 font-semibold text-right">Created</th>
                     {activeInventoryTab !== 'sold' && (
                       <th className="py-2.5 px-3 font-semibold text-center">Actions</th>
@@ -592,6 +956,18 @@ export const AdminView: React.FC = () => {
                       <td className="py-3 px-3 text-brand-muted">{p.category}</td>
                       <td className="py-3 px-3 text-right text-brand-text">{formatFollowers(p.followers)}</td>
                       <td className="py-3 px-3 text-right text-brand-navy font-bold">₦{Number(p.price).toLocaleString()}</td>
+                      <td className="py-3 px-3 text-center text-brand-text font-mono">
+                        {p.quantity_total - p.quantity_available} / {p.quantity_total} sold
+                        {p.quantity_available > 0 ? (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[9px] font-bold">
+                            {p.quantity_available} left
+                          </span>
+                        ) : (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-rose-500/10 text-brand-red text-[9px] font-bold">
+                            OUT OF STOCK
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-3 text-right text-brand-muted text-[10px]">
                         {new Date(p.created_at).toLocaleDateString()}
                       </td>
@@ -607,6 +983,13 @@ export const AdminView: React.FC = () => {
                                 }`}
                             >
                               {p.status === 'active' ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                            </button>
+                            <button
+                              onClick={() => handleStartEdit(p)}
+                              title="Edit listing & credentials"
+                              className="p-1.5 rounded-md border border-brand-border text-brand-navy hover:bg-brand-navy/5 transition cursor-pointer"
+                            >
+                              <Edit size={14} />
                             </button>
                             <button
                               onClick={() => handleDelete(p)}
@@ -626,6 +1009,200 @@ export const AdminView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ── Edit Listing Modal ── */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setEditingProduct(null)}
+          />
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-brand-card border border-brand-border rounded-xl shadow-2xl scrollbar-thin">
+            {/* Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-brand-card border-b border-brand-border rounded-t-xl">
+              <div>
+                <h3 className="text-sm font-bold font-mono text-brand-navy flex items-center gap-2">
+                  <Edit size={14} /> Edit Listing
+                </h3>
+                <p className="text-[10px] text-brand-muted font-mono mt-0.5 truncate max-w-[360px]">{editingProduct.title}</p>
+              </div>
+              <button
+                onClick={() => setEditingProduct(null)}
+                className="p-1.5 rounded-md border border-brand-border text-brand-muted hover:text-brand-red hover:border-brand-red transition cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProduct} className="p-6 space-y-5">
+              {/* Title, Price & Quantity */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Title</label>
+                  <input
+                    type="text" required value={editProductForm.title || ''}
+                    onChange={(e) => setEditProductForm((f: any) => ({ ...f, title: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Price (₦)</label>
+                  <input
+                    type="number" required min="0" step="0.01" value={editProductForm.price || ''}
+                    onChange={(e) => setEditProductForm((f: any) => ({ ...f, price: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Quantity</label>
+                  <input
+                    type="number" min={editingCredentials.filter(c => c.isSold).length || 1} value={editQuantity}
+                    onChange={(e) => handleEditQuantityChange(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Description</label>
+                <textarea
+                  rows={2} value={editProductForm.description || ''}
+                  onChange={(e) => setEditProductForm((f: any) => ({ ...f, description: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition resize-none"
+                />
+              </div>
+
+              {/* Niche & Tags */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Niche</label>
+                  <input
+                    type="text" value={editProductForm.niche || ''}
+                    onChange={(e) => setEditProductForm((f: any) => ({ ...f, niche: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Tags (comma-separated)</label>
+                  <input
+                    type="text" value={editProductForm.tags || ''}
+                    onChange={(e) => setEditProductForm((f: any) => ({ ...f, tags: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
+                  />
+                </div>
+              </div>
+
+              {/* ── Credentials Editor ── */}
+              <div className="space-y-3 p-4 rounded-md bg-brand-bg border border-brand-border">
+                <div className="flex items-center justify-between border-b border-brand-border/60 pb-2">
+                  <label className="text-[10px] text-brand-navy uppercase tracking-widest font-mono font-bold flex items-center gap-1.5">
+                    <AlertTriangle size={12} className="text-brand-red" />
+                    Credentials — {editQuantity} unit{editQuantity !== 1 ? 's' : ''}
+                    <span className="text-brand-muted font-normal">
+                      ({editingCredentials.filter(c => c.isSold).length} sold, {editingCredentials.filter(c => !c.isSold).length} unsold)
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEditBulkMode(!editBulkMode)}
+                    className="px-2 py-1 rounded border border-brand-border text-[9px] font-bold font-mono text-brand-muted hover:text-brand-navy hover:bg-brand-card transition cursor-pointer"
+                  >
+                    {editBulkMode ? 'Show Individual' : '+ Bulk Add'}
+                  </button>
+                </div>
+
+                {loadingEditCredentials ? (
+                  <div className="py-6 flex items-center justify-center gap-2 text-brand-muted text-xs font-mono">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading credentials...
+                  </div>
+                ) : (
+                  <>
+                    {editBulkMode && (
+                      <div className="space-y-2 p-3 rounded bg-brand-card border border-dashed border-brand-navy/40">
+                        <p className="text-[9px] text-brand-muted font-mono">Paste additional credential blocks separated by <code>---</code> or double newlines. They will be appended to the list below.</p>
+                        <textarea
+                          rows={5} value={editBulkPaste}
+                          onChange={(e) => setEditBulkPaste(e.target.value)}
+                          placeholder={"USERNAME : account_new\nPASSWORD : pass123\n---\nUSERNAME : another\nPASSWORD : pass456"}
+                          className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition resize-none"
+                        />
+                        <button
+                          type="button" onClick={handleEditProcessBulkPaste}
+                          className="py-1 px-3 bg-brand-navy text-white text-[10px] font-mono font-bold rounded hover:bg-brand-navy-light transition cursor-pointer border-0"
+                        >
+                          Append Units
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
+                      {editingCredentials.map((cred, idx) => (
+                        <div
+                          key={idx}
+                          className={`rounded border p-3 space-y-1.5 transition ${cred.isSold ? 'bg-rose-500/5 border-rose-500/20' : 'bg-brand-card border-brand-border/60'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold font-mono flex items-center gap-1.5">
+                              {cred.isSold ? (
+                                <span className="text-brand-red flex items-center gap-1">
+                                  <Lock size={9} /> UNIT {idx + 1} — SOLD
+                                  {cred.buyer_email && <span className="text-brand-muted font-normal ml-1">→ {cred.buyer_email}</span>}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600">UNIT {idx + 1} — AVAILABLE</span>
+                              )}
+                            </span>
+                            {!cred.isSold && (
+                              <button
+                                type="button"
+                                onClick={() => handleEditDeleteUnsold(idx)}
+                                className="p-1 rounded text-brand-red hover:bg-brand-red/10 transition cursor-pointer border-0"
+                                title="Remove this credential unit"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            rows={2}
+                            value={cred.cleartext || ''}
+                            disabled={cred.isSold}
+                            onChange={(e) => handleEditCredentialChange(idx, e.target.value)}
+                            className={`w-full px-3 py-2 text-xs rounded-md border text-brand-text font-mono focus:outline-none transition resize-none ${
+                              cred.isSold
+                                ? 'bg-brand-bg/40 border-brand-border/30 opacity-60 cursor-not-allowed'
+                                : 'bg-brand-bg border-brand-border focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30'
+                            }`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Save / Cancel */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={editSubmitting || loadingEditCredentials}
+                  className="flex items-center gap-1.5 py-2.5 px-6 rounded-md bg-brand-navy text-white text-xs font-bold transition border-0 disabled:opacity-50 cursor-pointer hover:bg-brand-navy-light"
+                >
+                  {editSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  className="py-2.5 px-6 rounded-md border border-brand-border text-brand-muted text-xs font-mono hover:bg-brand-bg transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
