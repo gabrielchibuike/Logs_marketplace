@@ -106,12 +106,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
         key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
         email: user.email,
         amount: Math.round(product.price * buyQty * 100), // in kobo, scaled by qty
-        callback: async (response: any) => {
-          const res = await completePayment(product.id, response.reference, buyQty);
-          if (res.success) {
-            onClose();
-            navigate('/dashboard');
-          }
+        callback: (response: any) => {
+          completePayment(product.id, response.reference, buyQty).then((res) => {
+            if (res.success) {
+              onClose();
+              navigate('/dashboard');
+            }
+          });
         },
         onClose: () => {
           showToast('Payment cancelled.', 'info');
