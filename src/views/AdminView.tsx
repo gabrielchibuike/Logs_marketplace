@@ -52,7 +52,7 @@ export const AdminView: React.FC = () => {
     { key: 'Platform', value: PLATFORMS[0] },
     { key: 'Handle', value: '' }
   ]);
-  const [formQuantity, setFormQuantity] = useState<number>(1);
+  const [formQuantity, setFormQuantity] = useState<number | ''>(1);
   const [formCredentialsList, setFormCredentialsList] = useState<string[]>(['']);
   const [formBulkPaste, setFormBulkPaste] = useState<string>('');
   const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
@@ -61,7 +61,7 @@ export const AdminView: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(null);
   const [editingCredentials, setEditingCredentials] = useState<{ id: string | null; encrypted_credentials: string; isSold: boolean; buyer_email?: string; cleartext?: string }[]>([]);
   const [loadingEditCredentials, setLoadingEditCredentials] = useState<boolean>(false);
-  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editQuantity, setEditQuantity] = useState<number | ''>(1);
   const [editBulkPaste, setEditBulkPaste] = useState<string>('');
   const [editBulkMode, setEditBulkMode] = useState<boolean>(false);
   const [deletedCredentialIds, setDeletedCredentialIds] = useState<string[]>([]);
@@ -646,7 +646,20 @@ export const AdminView: React.FC = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Quantity *</label>
                 <input
-                  type="number" required min="1" value={formQuantity} onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+                  type="number" required min="1" value={formQuantity}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setFormQuantity('');
+                    } else {
+                      handleQuantityChange(parseInt(val, 10) || 1);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (formQuantity === '' || formQuantity < 1) {
+                      handleQuantityChange(1);
+                    }
+                  }}
                   placeholder="e.g. 1"
                   className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
                 />
@@ -1057,7 +1070,20 @@ export const AdminView: React.FC = () => {
                   <label className="text-[10px] text-brand-muted uppercase tracking-widest font-mono block">Quantity</label>
                   <input
                     type="number" min={editingCredentials.filter(c => c.isSold).length || 1} value={editQuantity}
-                    onChange={(e) => handleEditQuantityChange(parseInt(e.target.value) || 1)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setEditQuantity('');
+                      } else {
+                        handleEditQuantityChange(parseInt(val, 10) || 1);
+                      }
+                    }}
+                    onBlur={() => {
+                      const minSold = editingCredentials.filter(c => c.isSold).length || 1;
+                      if (editQuantity === '' || editQuantity < minSold) {
+                        handleEditQuantityChange(minSold);
+                      }
+                    }}
                     className="w-full px-3 py-2 text-xs rounded-md bg-brand-bg border border-brand-border text-brand-text font-mono focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30 transition"
                   />
                 </div>

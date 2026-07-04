@@ -65,7 +65,8 @@ export const LogTerminal: React.FC<LogTerminalProps> = ({ title, content, maxHei
     );
   };
 
-  const lines = content.split('\n');
+  const safeContent = typeof content === 'string' ? content : String(content || '');
+  const lines = safeContent.split('\n');
 
   return (
     <div className="w-full rounded-md border border-brand-navy-light bg-brand-navy shadow-sm overflow-hidden flex flex-col font-mono">

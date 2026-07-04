@@ -28,24 +28,6 @@ export const DashboardView: React.FC = () => {
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsLoading, setSettingsLoading] = useState(false);
 
-  if (!user) {
-    return (
-      <div className="w-full py-20 flex flex-col items-center justify-center text-center">
-        <div className="bg-brand-card p-10 rounded-md border border-brand-border glass max-w-md w-full">
-          <ShieldCheck size={48} className="text-brand-red mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-brand-navy font-mono mb-2 uppercase tracking-wide">Authentication Required</h2>
-          <p className="text-sm text-brand-muted mb-6">You need to sign in to view your purchased accounts, transaction history, and secure credentials.</p>
-          <button
-            onClick={() => setAuthModalOpen(true)}
-            className="w-full py-3 bg-brand-red hover:bg-brand-red-hover text-white transition font-mono font-bold rounded-md cursor-pointer border-0"
-          >
-            Sign In to Access Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const purchasedProducts = purchases
     .map((id) => products.find((p) => p.id === id))
     .filter(Boolean) as Product[];
@@ -53,42 +35,54 @@ export const DashboardView: React.FC = () => {
   const totalPurchased = purchasedProducts.length;
   const totalFollowers = purchasedProducts.reduce((sum, p) => sum + p.followers, 0);
 
-  // Auto-select first purchased product
-  useEffect(() => {
-    if (!selectedProduct && purchasedProducts.length > 0) {
-      setSelectedProduct(purchasedProducts[0]);
-    }
-  }, [purchasedProducts, selectedProduct]);
+  const activeProduct = selectedProduct || (purchasedProducts.length > 0 ? purchasedProducts[0] : null);
 
   // Fetch selected product credentials
   useEffect(() => {
-    if (selectedProduct && user) {
-      if (!user.email_confirmed_at) {
-        setCredentials('Email verification required.');
-        setLoadingCreds(false);
-        return;
-      }
+    let active = true;
+    if (activeProduct && user && user.email_confirmed_at) {
       const fetchCreds = async () => {
         setLoadingCreds(true);
         try {
           const { data, error } = await supabase.rpc('get_purchased_asset_data', {
-            product_id_param: selectedProduct.id
+            product_id_param: activeProduct.id
           });
           if (error) throw error;
-          const decrypted = data ? await decryptText(data) : 'No access credentials returned.';
-          setCredentials(decrypted);
+          
+          let decrypted = '';
+          if (Array.isArray(data)) {
+            // Decrypt each credential item in the returned JSONB array
+            const decryptedParts = await Promise.all(
+              data.map(async (encStr: string, i: number) => {
+                const text = await decryptText(encStr);
+                return data.length > 1 ? `─── UNIT ${i + 1} ───\n${text}` : text;
+              })
+            );
+            decrypted = decryptedParts.join('\n\n');
+          } else if (data) {
+            decrypted = await decryptText(data);
+          } else {
+            decrypted = 'No access credentials returned.';
+          }
+          
+          if (active) setCredentials(decrypted);
         } catch (err: any) {
           console.error('Error fetching dashboard credentials:', err);
-          setCredentials('Error loading access credentials: ' + err.message);
+          if (active) setCredentials('Error loading access credentials: ' + err.message);
         } finally {
-          setLoadingCreds(false);
+          if (active) setLoadingCreds(false);
         }
       };
       fetchCreds();
     } else {
-      setCredentials('');
+      Promise.resolve().then(() => {
+        if (active) setCredentials('');
+      });
     }
-  }, [selectedProduct, user]);
+    return () => {
+      active = false;
+    };
+  }, [activeProduct, user]);
 
   // Fetch transaction history
   useEffect(() => {
@@ -168,6 +162,24 @@ export const DashboardView: React.FC = () => {
       default: return '🌐';
     }
   };
+
+  if (!user) {
+    return (
+      <div className="w-full py-20 flex flex-col items-center justify-center text-center">
+        <div className="bg-brand-card p-10 rounded-md border border-brand-border glass max-w-md w-full">
+          <ShieldCheck size={48} className="text-brand-red mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-brand-navy font-mono mb-2 uppercase tracking-wide">Authentication Required</h2>
+          <p className="text-sm text-brand-muted mb-6">You need to sign in to view your purchased accounts, transaction history, and secure credentials.</p>
+          <button
+            onClick={() => setAuthModalOpen(true)}
+            className="w-full py-3 bg-brand-red hover:bg-brand-red-hover text-white transition font-mono font-bold rounded-md cursor-pointer border-0"
+          >
+            Sign In to Access Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full py-6 space-y-6">
@@ -258,11 +270,10 @@ export const DashboardView: React.FC = () => {
             setSettingsError('');
             setSettingsSuccess('');
           }}
-          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${
-            activeTab === 'logs'
+          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${activeTab === 'logs'
               ? 'border-brand-red text-brand-navy'
               : 'border-transparent text-brand-muted hover:text-brand-navy'
-          }`}
+            }`}
         >
           <Key size={14} /> Accounts & Logs
         </button>
@@ -272,11 +283,10 @@ export const DashboardView: React.FC = () => {
             setSettingsError('');
             setSettingsSuccess('');
           }}
-          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${
-            activeTab === 'transactions'
+          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${activeTab === 'transactions'
               ? 'border-brand-red text-brand-navy'
               : 'border-transparent text-brand-muted hover:text-brand-navy'
-          }`}
+            }`}
         >
           <Clock size={14} /> Transaction History
         </button>
@@ -286,11 +296,10 @@ export const DashboardView: React.FC = () => {
             setSettingsError('');
             setSettingsSuccess('');
           }}
-          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${
-            activeTab === 'settings'
+          className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${activeTab === 'settings'
               ? 'border-brand-red text-brand-navy'
               : 'border-transparent text-brand-muted hover:text-brand-navy'
-          }`}
+            }`}
         >
           <Settings size={14} /> Account Settings
         </button>
@@ -317,11 +326,11 @@ export const DashboardView: React.FC = () => {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                {purchasedProducts.map((p) => (
+                {purchasedProducts.map((p, index) => (
                   <button
-                    key={p.id}
+                    key={`${p.id}-${index}`}
                     onClick={() => setSelectedProduct(p)}
-                    className={`w-full p-3 rounded-md border text-left transition flex items-center justify-between gap-3 group cursor-pointer ${selectedProduct?.id === p.id
+                    className={`w-full p-3 rounded-md border text-left transition flex items-center justify-between gap-3 group cursor-pointer ${activeProduct?.id === p.id
                       ? 'bg-brand-navy/5 border-brand-navy text-brand-navy font-semibold'
                       : 'bg-brand-card border-brand-border text-brand-text hover:bg-brand-bg hover:text-brand-navy'
                       }`}
@@ -336,7 +345,7 @@ export const DashboardView: React.FC = () => {
                         <span>{formatFollowers(p.followers)} followers</span>
                       </div>
                     </div>
-                    <Eye size={14} className={`shrink-0 ${selectedProduct?.id === p.id ? 'text-brand-navy' : 'text-brand-muted group-hover:text-brand-navy'}`} />
+                    <Eye size={14} className={`shrink-0 ${activeProduct?.id === p.id ? 'text-brand-navy' : 'text-brand-muted group-hover:text-brand-navy'}`} />
                   </button>
                 ))}
               </div>
@@ -345,7 +354,7 @@ export const DashboardView: React.FC = () => {
 
           {/* Credentials Viewer */}
           <div className="lg:col-span-2 flex flex-col justify-between h-full min-h-[400px]">
-            {selectedProduct ? (
+            {activeProduct ? (
               <div className="flex flex-col h-full justify-between">
                 {!user?.email_confirmed_at ? (
                   <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-brand-border rounded-md bg-brand-card text-center p-6 gap-4 glass">
@@ -366,7 +375,7 @@ export const DashboardView: React.FC = () => {
                   </div>
                 ) : (
                   <LogTerminal
-                    title={`${selectedProduct.id}_credentials.txt`}
+                    title={`${activeProduct.id}_credentials.txt`}
                     content={credentials}
                     maxHeight="max-h-[420px]"
                   />
@@ -375,7 +384,7 @@ export const DashboardView: React.FC = () => {
                 {/* Buyer Protection Control Panel */}
                 <div className="mt-3 p-4 rounded-md bg-brand-card border border-brand-border flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
                   <div className="flex items-start gap-2.5">
-                    <div className={`p-2 rounded-md border ${disputedIds.includes(selectedProduct.id)
+                    <div className={`p-2 rounded-md border ${disputedIds.includes(activeProduct.id)
                       ? 'bg-rose-50 border-rose-200 text-brand-red'
                       : 'bg-brand-navy/5 border border-brand-navy/10 text-brand-navy'
                       }`}>
@@ -383,21 +392,21 @@ export const DashboardView: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-[10px] text-brand-muted font-mono block">EXCLUSIVITY GUARANTEE</span>
-                      <span className={`text-xs font-semibold block ${disputedIds.includes(selectedProduct.id) ? 'text-brand-red' : 'text-brand-navy'}`}>
-                        {disputedIds.includes(selectedProduct.id)
+                      <span className={`text-xs font-semibold block ${disputedIds.includes(activeProduct.id) ? 'text-brand-red' : 'text-brand-navy'}`}>
+                        {disputedIds.includes(activeProduct.id)
                           ? '🚨 TRANSACTION DISPUTED (Admin Alerted)'
                           : '🛡️ 72-Hour Buyer Protection: Active'}
                       </span>
                       <span className="text-[9px] text-brand-muted font-mono block mt-0.5">
-                        {disputedIds.includes(selectedProduct.id)
+                        {disputedIds.includes(activeProduct.id)
                           ? 'Funds frozen. Auditing seller credential logs.'
                           : 'Expires in: 71h 59m'}
                       </span>
                     </div>
                   </div>
-                  {!disputedIds.includes(selectedProduct.id) && (
+                  {!disputedIds.includes(activeProduct.id) && (
                     <button
-                      onClick={() => handleRaiseDispute(selectedProduct.id)}
+                      onClick={() => handleRaiseDispute(activeProduct.id)}
                       className="px-3 py-1.5 rounded-md border border-brand-red text-brand-red hover:bg-brand-red/5 text-[10px] font-mono font-semibold transition cursor-pointer shrink-0"
                     >
                       Raise Dispute
