@@ -103,7 +103,7 @@ export const AuthModal: React.FC = () => {
             <Lock className="text-brand-navy w-5 h-5" />
           </div>
           <h2 className="text-lg font-extrabold tracking-tight text-brand-navy uppercase">
-            Paid<span className="text-brand-red">Log</span>Store Auth
+            n_<span className="text-brand-red">logs</span> Auth
           </h2>
           <p className="text-[11px] text-brand-muted">
             {authTab === 'forgot_password' 
