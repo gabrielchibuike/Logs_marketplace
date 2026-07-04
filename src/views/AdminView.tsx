@@ -267,7 +267,7 @@ export const AdminView: React.FC = () => {
       setDeletedCredentialIds(prev => [...prev, item.id as string]);
     }
     setEditingCredentials(prev => prev.filter((_, i) => i !== idx));
-    setEditQuantity(prev => prev - 1);
+    setEditQuantity(prev => typeof prev === 'number' ? prev - 1 : '');
   };
 
   const handleEditProcessBulkPaste = () => {
