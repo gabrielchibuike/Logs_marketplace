@@ -32,6 +32,7 @@ export const DashboardView: React.FC = () => {
     .map((id) => products.find((p) => p.id === id))
     .filter(Boolean) as Product[];
 
+
   const totalPurchased = purchasedProducts.length;
   const totalFollowers = purchasedProducts.reduce((sum, p) => sum + p.followers, 0);
 
@@ -40,15 +41,16 @@ export const DashboardView: React.FC = () => {
   // Fetch selected product credentials
   useEffect(() => {
     let active = true;
-    if (activeProduct && user && user.email_confirmed_at) {
+    if (activeProduct && user) {
       const fetchCreds = async () => {
         setLoadingCreds(true);
         try {
           const { data, error } = await supabase.rpc('get_purchased_asset_data', {
             product_id_param: activeProduct.id
           });
+
           if (error) throw error;
-          
+
           let decrypted = '';
           if (Array.isArray(data)) {
             // Decrypt each credential item in the returned JSONB array
@@ -64,7 +66,7 @@ export const DashboardView: React.FC = () => {
           } else {
             decrypted = 'No access credentials returned.';
           }
-          
+
           if (active) setCredentials(decrypted);
         } catch (err: any) {
           console.error('Error fetching dashboard credentials:', err);
@@ -271,8 +273,8 @@ export const DashboardView: React.FC = () => {
             setSettingsSuccess('');
           }}
           className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${activeTab === 'logs'
-              ? 'border-brand-red text-brand-navy'
-              : 'border-transparent text-brand-muted hover:text-brand-navy'
+            ? 'border-brand-red text-brand-navy'
+            : 'border-transparent text-brand-muted hover:text-brand-navy'
             }`}
         >
           <Key size={14} /> Accounts & Logs
@@ -284,8 +286,8 @@ export const DashboardView: React.FC = () => {
             setSettingsSuccess('');
           }}
           className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${activeTab === 'transactions'
-              ? 'border-brand-red text-brand-navy'
-              : 'border-transparent text-brand-muted hover:text-brand-navy'
+            ? 'border-brand-red text-brand-navy'
+            : 'border-transparent text-brand-muted hover:text-brand-navy'
             }`}
         >
           <Clock size={14} /> Transaction History
@@ -297,8 +299,8 @@ export const DashboardView: React.FC = () => {
             setSettingsSuccess('');
           }}
           className={`pb-2.5 px-1 text-xs font-bold tracking-wider uppercase transition cursor-pointer border-b-2 font-mono flex items-center gap-1.5 ${activeTab === 'settings'
-              ? 'border-brand-red text-brand-navy'
-              : 'border-transparent text-brand-muted hover:text-brand-navy'
+            ? 'border-brand-red text-brand-navy'
+            : 'border-transparent text-brand-muted hover:text-brand-navy'
             }`}
         >
           <Settings size={14} /> Account Settings

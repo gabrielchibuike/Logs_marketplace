@@ -168,6 +168,16 @@ CREATE POLICY "Anyone can browse active products"
 ON public.products FOR SELECT 
 USING (status = 'active');
 
+-- 1b. Buyers can view their purchased products even if sold
+CREATE POLICY "Buyers can view their purchased products" 
+ON public.products FOR SELECT 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.purchased_accounts 
+        WHERE purchased_accounts.product_id = id AND purchased_accounts.buyer_id = auth.uid()
+    )
+);
+
 -- 2. Admins can do everything on products
 CREATE POLICY "Admins can do everything on products" 
 ON public.products FOR ALL 
