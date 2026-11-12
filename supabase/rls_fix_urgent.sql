@@ -34,3 +34,4 @@ USING (public.is_admin(auth.uid()));
 -- SELECT id, title, status FROM products;  -- should return all 4 products for admin
 -- SELECT id, title, status FROM products;  -- (as anon) should return only active ones
 -- ============================================================
+
