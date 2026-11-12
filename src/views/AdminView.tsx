@@ -26,7 +26,7 @@ const PLATFORMS = ['Instagram', 'Twitter/X', 'TikTok', 'YouTube', 'Facebook'];
 const CATEGORIES = ['Aged Account', 'High Followers', 'Creator', 'Business Page', 'Verified'];
 
 export const AdminView: React.FC = () => {
-  const { user, userProfile, showToast } = useApp();
+  const { user, userProfile, showToast, refreshProducts } = useApp();
 
   const [inventory, setInventory] = useState<InventoryProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +91,7 @@ export const AdminView: React.FC = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchInventory();
+      if (refreshProducts) refreshProducts();
     }
   }, [isAdmin]);
 
@@ -371,6 +372,8 @@ export const AdminView: React.FC = () => {
       showToast('Product listing and credentials updated successfully.', 'success');
       setEditingProduct(null);
       fetchInventory();
+      if (refreshProducts) refreshProducts();
+      if (refreshProducts) refreshProducts();
     } catch (err: any) {
       showToast('Update failed: ' + err.message, 'error');
     } finally {
@@ -398,6 +401,8 @@ export const AdminView: React.FC = () => {
       if (error) throw error;
       showToast(`"${product.title}" moved to ${newStatus}.`, 'success');
       fetchInventory();
+      if (refreshProducts) refreshProducts();
+      if (refreshProducts) refreshProducts();
     } catch (err: any) {
       showToast('Status update failed: ' + err.message, 'error');
     }
@@ -419,6 +424,8 @@ export const AdminView: React.FC = () => {
       if (error) throw error;
       showToast(`"${product.title}" deleted permanently.`, 'success');
       fetchInventory();
+      if (refreshProducts) refreshProducts();
+      if (refreshProducts) refreshProducts();
     } catch (err: any) {
       showToast('Delete failed: ' + err.message, 'error');
     }
@@ -507,6 +514,7 @@ export const AdminView: React.FC = () => {
       setFormBulkPaste('');
       setShowAddForm(false);
       fetchInventory();
+      if (refreshProducts) refreshProducts();
     } catch (err: any) {
       showToast('Insert failed: ' + err.message, 'error');
     } finally {

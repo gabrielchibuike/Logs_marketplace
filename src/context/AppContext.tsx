@@ -26,6 +26,7 @@ interface AppContextType {
   clearCart: () => void;
   completePayment: (productId: string, reference: string, quantity?: number) => Promise<{ success: boolean; error?: string }>;
   hasPurchased: (id: string) => boolean;
+  refreshProducts: () => Promise<void>;
   signUp: (email: string, pass: string) => Promise<{ success: boolean; error?: string; emailConfirmationRequired?: boolean }>;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
@@ -127,6 +128,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [cart]);
 
 
+  // 1. Fetch live products from PostgreSQL (excluding sensitive credentials column)
+  const fetchLiveProducts = async () => {
+    try {
+      setDbError(null);
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data, quantity_total, quantity_available')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data) {
+        // Format DB products into matching types
+        const formatted = data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description || '',
+          price: parseFloat(item.price),
+          platform: item.platform,
+          category: item.category,
+          followers: item.followers,
+          following: item.following,
+          engagement: parseFloat(item.engagement),
+          accountAgeDays: item.account_age_days,
+          posts: item.posts,
+          verified: item.verified,
+          niche: item.niche || '',
+          tags: Array.isArray(item.tags) ? item.tags : [],
+          sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
+          quantityTotal: item.quantity_total !== undefined ? item.quantity_total : 1,
+          quantityAvailable: item.quantity_available !== undefined ? item.quantity_available : 1,
+          fullDataContent: '' // Protected credentials column not loaded on catalog fetch
+        }));
+        setProducts(formatted);
+      }
+    } catch (err: any) {
+      console.error('Error fetching live products from DB:', err);
+      setDbError(err.message || 'Failed to sync with Supabase products table');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- LIVE SUPABASE LOGIC SYNC ---
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -135,49 +178,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setLoading(true);
-
-    // 1. Fetch live products from PostgreSQL (excluding sensitive credentials column)
-    const fetchLiveProducts = async () => {
-      try {
-        setDbError(null);
-        const { data, error } = await supabase
-          .from('products')
-          .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data, quantity_total, quantity_available')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        if (data) {
-          // Format DB products into matching types
-          const formatted = data.map((item: any) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description || '',
-            price: parseFloat(item.price),
-            platform: item.platform,
-            category: item.category,
-            followers: item.followers,
-            following: item.following,
-            engagement: parseFloat(item.engagement),
-            accountAgeDays: item.account_age_days,
-            posts: item.posts,
-            verified: item.verified,
-            niche: item.niche || '',
-            tags: Array.isArray(item.tags) ? item.tags : [],
-            sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
-            quantityTotal: item.quantity_total !== undefined ? item.quantity_total : 1,
-            quantityAvailable: item.quantity_available !== undefined ? item.quantity_available : 1,
-            fullDataContent: '' // Protected credentials column not loaded on catalog fetch
-          }));
-          setProducts(formatted);
-        }
-      } catch (err: any) {
-        console.error('Error fetching live products from DB:', err);
-        setDbError(err.message || 'Failed to sync with Supabase products table');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchLiveProducts();
 
     // 2. Setup auth state listeners
@@ -185,6 +185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (session?.user) {
         setUser(session.user);
         syncUserProfile(session.user.id, session.user.email || '');
+        fetchLiveProducts();
       }
     });
 
@@ -192,10 +193,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (session?.user) {
         setUser(session.user);
         syncUserProfile(session.user.id, session.user.email || '');
+        fetchLiveProducts();
       } else {
         setUser(null);
         setUserProfile(null);
         setPurchases([]);
+        fetchLiveProducts();
       }
     });
 
@@ -223,10 +226,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
-      // B. Fetch purchased accounts mapping
+      // B. Fetch purchased accounts mapping (ordered newest first)
       const { data: bought, error: boughtErr } = await supabase
         .from('purchased_accounts')
-        .select('product_id');
+        .select('product_id')
+        .order('created_at', { ascending: false });
 
       if (boughtErr) throw boughtErr;
       if (bought) {
@@ -303,10 +307,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error(errorMsg || 'Checkout transaction registration failed.');
       }
 
-      // Sync updated purchases mapping
-      await syncUserProfile(user.id, user.email || '');
+      // 1. Immediately decrement quantity locally in state so the UI reflects it without delay
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p.id === productId) {
+            const updatedAvailable = Math.max(0, p.quantityAvailable - quantity);
+            return {
+              ...p,
+              quantityAvailable: updatedAvailable,
+            };
+          }
+          return p;
+        })
+      );
 
-      // Remove product from cart if it was inside
+      // 2. Sync profile purchases and re-fetch live products from DB
+      await syncUserProfile(user.id, user.email || '');
+      await fetchLiveProducts();
+
+      // 3. Remove product from cart if it was inside
       setCart((prev) => prev.filter((id) => id !== productId));
 
       showToast('Payment verified! Digital asset credentials unlocked.', 'success');
@@ -418,6 +437,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearCart,
       completePayment,
       hasPurchased,
+      refreshProducts: fetchLiveProducts,
       signUp,
       signIn,
       signOut,

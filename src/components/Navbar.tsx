@@ -30,7 +30,7 @@ export const Navbar: React.FC = () => {
           const res = await completePayment(product.id, response.reference);
           if (res.success) {
             setCartOpen(false);
-            navigate('/dashboard');
+            navigate('/dashboard', { state: { selectedProductId: product.id } });
           }
         },
         onClose: () => {

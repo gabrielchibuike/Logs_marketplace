@@ -41,7 +41,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
   const navigate = useNavigate();
 
   const isPurchased = purchases.includes(product.id);
-  const isOutOfStock = product.quantityAvailable === 0 && !isPurchased;
+  const isOutOfStock = product.quantityAvailable === 0;
 
   const getCategoryBadge = (cat: string) => {
     switch (cat) {
@@ -76,7 +76,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
         callback: (response: any) => {
           completePayment(product.id, response.reference).then((res) => {
             if (res.success) {
-              navigate('/dashboard');
+              navigate('/dashboard', { state: { selectedProductId: product.id } });
             }
           });
         },
@@ -113,6 +113,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
                 {product.quantityAvailable} in stock
               </span>
             ) : null}
+            {isPurchased && (
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-blue-50 border border-blue-200 text-blue-700">
+                Owned
+              </span>
+            )}
             <span className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold ${getCategoryBadge(product.category)}`}>
               {product.category}
             </span>
@@ -173,26 +178,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
             <Eye size={15} />
           </button>
 
-          {isPurchased ? (
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-1 py-1.5 px-3 rounded bg-brand-navy/5 border border-brand-navy/20 text-brand-navy hover:bg-brand-navy/10 text-xs font-bold transition duration-200 cursor-pointer"
-            >
-              <Check size={13} /> Owned
-            </button>
-          ) : isOutOfStock ? (
-            <button
-              disabled
-              className="flex items-center gap-1 py-1.5 px-3 rounded bg-brand-border border border-brand-border text-brand-muted text-xs font-bold cursor-not-allowed opacity-60"
-            >
-              <CreditCard size={13} /> Sold Out
-            </button>
+          {isOutOfStock ? (
+            isPurchased ? (
+              <button
+                onClick={() => navigate('/dashboard', { state: { selectedProductId: product.id } })}
+                className="flex items-center gap-1 py-1.5 px-3 rounded bg-brand-navy/5 border border-brand-navy/20 text-brand-navy hover:bg-brand-navy/10 text-xs font-bold transition duration-200 cursor-pointer"
+              >
+                <Check size={13} /> Owned
+              </button>
+            ) : (
+              <button
+                disabled
+                className="flex items-center gap-1 py-1.5 px-3 rounded bg-brand-border border border-brand-border text-brand-muted text-xs font-bold cursor-not-allowed opacity-60"
+              >
+                <CreditCard size={13} /> Sold Out
+              </button>
+            )
           ) : (
             <button
               onClick={handlePaystackCheckout}
               className="flex items-center gap-1 py-1.5 px-3 rounded bg-brand-red hover:bg-brand-red-hover text-white text-xs font-bold transition duration-200 cursor-pointer"
             >
-              <CreditCard size={13} /> Pay via Paystack
+              <CreditCard size={13} /> {isPurchased ? 'Buy More' : 'Pay via Paystack'}
             </button>
           )}
         </div>

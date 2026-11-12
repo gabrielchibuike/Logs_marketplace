@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Product } from '../data/products';
 import { LogTerminal } from '../components/LogTerminal';
-import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck, Settings, Lock, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck, Settings, ShieldAlert } from 'lucide-react';
 import { supabase } from '../utils/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { decryptText } from '../utils/crypto';
 
 export const DashboardView: React.FC = () => {
-  const { purchases, products, user, setAuthModalOpen } = useApp();
+  const { purchases, products, user, setAuthModalOpen, refreshProducts } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigatedProductId = (location.state as any)?.selectedProductId;
+
   const [activeTab, setActiveTab] = useState<'logs' | 'transactions' | 'settings'>('logs');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [ledgerSearch, setLedgerSearch] = useState('');
@@ -28,15 +31,25 @@ export const DashboardView: React.FC = () => {
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsLoading, setSettingsLoading] = useState(false);
 
-  const purchasedProducts = purchases
+  // Re-fetch products when Dashboard mounts or purchases change to guarantee all purchased accounts are in state
+  useEffect(() => {
+    if (refreshProducts) {
+      refreshProducts();
+    }
+  }, [refreshProducts, purchases.length]);
+
+  // Unique purchased products preserving order of purchase
+  const uniquePurchasedProductIds = Array.from(new Set(purchases));
+  const purchasedProducts = uniquePurchasedProductIds
     .map((id) => products.find((p) => p.id === id))
     .filter(Boolean) as Product[];
 
-
-  const totalPurchased = purchasedProducts.length;
+  const totalPurchased = purchases.length;
   const totalFollowers = purchasedProducts.reduce((sum, p) => sum + p.followers, 0);
 
-  const activeProduct = selectedProduct || (purchasedProducts.length > 0 ? purchasedProducts[0] : null);
+  const activeProduct = selectedProduct 
+    || (navigatedProductId ? purchasedProducts.find(p => p.id === navigatedProductId) : null)
+    || (purchasedProducts.length > 0 ? purchasedProducts[0] : null);
 
   // Fetch selected product credentials
   useEffect(() => {
@@ -212,9 +225,9 @@ export const DashboardView: React.FC = () => {
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xs font-bold font-mono uppercase tracking-wider">Email Verification Pending</h4>
+              <h4 className="text-xs font-bold font-mono uppercase tracking-wider">Email Verification Recommended</h4>
               <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1 max-w-2xl leading-relaxed">
-                Your email address <strong className="font-mono">{user?.email}</strong> is not verified yet. Decryption of sensitive account credentials is locked until verification is complete.
+                Your email address <strong className="font-mono">{user?.email}</strong> is not verified yet. We recommend verifying your email for account recovery and transaction alerts.
               </p>
             </div>
           </div>
@@ -328,28 +341,44 @@ export const DashboardView: React.FC = () => {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                {purchasedProducts.map((p, index) => (
-                  <button
-                    key={`${p.id}-${index}`}
-                    onClick={() => setSelectedProduct(p)}
-                    className={`w-full p-3 rounded-md border text-left transition flex items-center justify-between gap-3 group cursor-pointer ${activeProduct?.id === p.id
-                      ? 'bg-brand-navy/5 border-brand-navy text-brand-navy font-semibold'
-                      : 'bg-brand-card border-brand-border text-brand-text hover:bg-brand-bg hover:text-brand-navy'
+                {purchasedProducts.map((p) => {
+                  const unitsOwned = purchases.filter((id) => id === p.id).length;
+                  const isSelected = activeProduct?.id === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedProduct(p)}
+                      className={`w-full p-3 rounded-md border text-left transition flex items-center justify-between gap-3 group cursor-pointer ${
+                        isSelected
+                          ? 'bg-brand-navy/5 border-brand-navy text-brand-navy font-semibold'
+                          : 'bg-brand-card border-brand-border text-brand-text hover:bg-brand-bg hover:text-brand-navy'
                       }`}
-                  >
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-semibold truncate group-hover:text-brand-navy transition">
-                        {getPlatformIcon(p.platform)} {p.title}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-1 font-mono text-[9px] text-brand-muted">
-                        <span>{p.platform}</span>
-                        <span>•</span>
-                        <span>{formatFollowers(p.followers)} followers</span>
+                    >
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-semibold truncate group-hover:text-brand-navy transition">
+                          {getPlatformIcon(p.platform)} {p.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1 font-mono text-[9px] text-brand-muted">
+                          <span>{p.platform}</span>
+                          <span>•</span>
+                          {unitsOwned > 1 ? (
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                              {unitsOwned} units owned
+                            </span>
+                          ) : (
+                            <span>{formatFollowers(p.followers)} followers</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <Eye size={14} className={`shrink-0 ${activeProduct?.id === p.id ? 'text-brand-navy' : 'text-brand-muted group-hover:text-brand-navy'}`} />
-                  </button>
-                ))}
+                      <Eye
+                        size={14}
+                        className={`shrink-0 ${
+                          isSelected ? 'text-brand-navy' : 'text-brand-muted group-hover:text-brand-navy'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -358,19 +387,7 @@ export const DashboardView: React.FC = () => {
           <div className="lg:col-span-2 flex flex-col justify-between h-full min-h-[400px]">
             {activeProduct ? (
               <div className="flex flex-col h-full justify-between">
-                {!user?.email_confirmed_at ? (
-                  <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-brand-border rounded-md bg-brand-card text-center p-6 gap-4 glass">
-                    <div className="w-14 h-14 rounded-full bg-brand-red/10 border border-brand-red/20 flex items-center justify-center text-brand-red animate-pulse">
-                      <Lock size={24} />
-                    </div>
-                    <div className="space-y-2 max-w-sm">
-                      <h3 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono">Credentials Securely Locked</h3>
-                      <p className="text-xs text-brand-muted leading-relaxed">
-                        To access this account's passwords, login tokens, and recovery keys, you must first verify your email address. Check your inbox for the activation link.
-                      </p>
-                    </div>
-                  </div>
-                ) : loadingCreds ? (
+                {loadingCreds ? (
                   <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center border border-brand-border rounded-md bg-brand-card text-center gap-2 text-xs font-mono text-brand-navy">
                     <div className="w-5 h-5 rounded-full border-2 border-brand-navy/20 border-t-brand-navy animate-spin"></div>
                     <span>Decrypting secure digital assets...</span>

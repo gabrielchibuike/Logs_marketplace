@@ -47,7 +47,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
 
   const isPurchased = purchases.includes(product.id);
   const isInCart = cart.includes(product.id);
-  const isOutOfStock = product.quantityAvailable === 0 && !isPurchased;
+  const isOutOfStock = product.quantityAvailable === 0;
   const maxQty = product.quantityAvailable;
   const isMultiUnit = maxQty > 1;
 
@@ -110,7 +110,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
           completePayment(product.id, response.reference, buyQty).then((res) => {
             if (res.success) {
               onClose();
-              navigate('/dashboard');
+              navigate('/dashboard', { state: { selectedProductId: product.id } });
             }
           });
         },
@@ -278,7 +278,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
             </div>
 
             {/* Quantity stepper — only shown for multi-unit available listings */}
-            {isMultiUnit && !isPurchased && !isOutOfStock && (
+            {isMultiUnit && !isOutOfStock && (
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] text-brand-muted font-mono uppercase tracking-widest">Qty</span>
                 <div className="flex items-center gap-1">
@@ -309,17 +309,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
               Close Window
             </button>
 
-            {isPurchased ? (
-              <div className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-emerald-550 border border-emerald-600/30 text-white font-bold text-xs">
-                <Check size={14} /> Owned — Unlocked
-              </div>
-            ) : isOutOfStock ? (
-              <button
-                disabled
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-brand-border border border-brand-border text-brand-muted font-bold text-xs cursor-not-allowed opacity-60"
-              >
-                <CreditCard size={14} /> Sold Out
-              </button>
+            {isOutOfStock ? (
+              isPurchased ? (
+                <button
+                  onClick={() => {
+                    onClose();
+                    navigate('/dashboard', { state: { selectedProductId: product.id } });
+                  }}
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-emerald-550 border border-emerald-600/30 text-white font-bold text-xs cursor-pointer"
+                >
+                  <Check size={14} /> Owned — View on Dashboard
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-brand-border border border-brand-border text-brand-muted font-bold text-xs cursor-not-allowed opacity-60"
+                >
+                  <CreditCard size={14} /> Sold Out
+                </button>
+              )
             ) : isInCart ? (
               <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
                 <div className="flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-brand-navy/10 border border-brand-border text-brand-navy font-bold text-xs">
@@ -329,11 +337,22 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
                   onClick={handlePaystackCheckout}
                   className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-brand-red hover:bg-brand-red-hover text-white font-bold text-xs transition duration-200 cursor-pointer"
                 >
-                  <CreditCard size={14} /> Pay via Paystack
+                  <CreditCard size={14} /> {isPurchased ? `Buy More (${buyQty})` : 'Pay via Paystack'}
                 </button>
               </div>
             ) : (
-              <>
+              <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                {isPurchased && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      navigate('/dashboard', { state: { selectedProductId: product.id } });
+                    }}
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-3 rounded bg-brand-navy/10 border border-brand-navy/20 text-brand-navy font-bold text-xs cursor-pointer hover:bg-brand-navy/20 transition"
+                  >
+                    <Check size={14} /> View Owned on Dashboard
+                  </button>
+                )}
                 <button
                   onClick={() => { addToCart(product.id); }}
                   className="w-full sm:w-auto py-2 px-4 rounded border border-brand-navy/20 hover:border-brand-navy text-brand-navy hover:bg-brand-card transition duration-200 font-bold text-xs cursor-pointer bg-transparent"
@@ -344,9 +363,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
                   onClick={handlePaystackCheckout}
                   className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 rounded bg-brand-red hover:bg-brand-red-hover text-white font-bold text-xs transition duration-200 cursor-pointer"
                 >
-                  <CreditCard size={14} /> Pay via Paystack
+                  <CreditCard size={14} /> {isPurchased ? `Buy More (${buyQty})` : 'Pay via Paystack'}
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>
