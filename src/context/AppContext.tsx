@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Product } from '../data/products';
 import { supabase, isSupabaseConfigured } from '../utils/supabase';
 import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
@@ -135,7 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // 1. Fetch live products from PostgreSQL (excluding sensitive credentials column)
-  const fetchLiveProducts = async () => {
+  const fetchLiveProducts = useCallback(async () => {
     try {
       setDbError(null);
       const { data, error } = await supabase
@@ -174,7 +174,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // --- LIVE SUPABASE LOGIC SYNC ---
   useEffect(() => {

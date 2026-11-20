@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Product } from '../data/products';
 import { LogTerminal } from '../components/LogTerminal';
@@ -41,27 +41,35 @@ export const DashboardView: React.FC = () => {
   // Unique purchased products preserving order of purchase.
   // Looks up in ownedProducts first (covers sold-out items fetched for the buyer),
   // then falls back to the main products array (covers active items just purchased).
-  const uniquePurchasedProductIds = Array.from(new Set(purchases));
-  const purchasedProducts = uniquePurchasedProductIds
-    .map((id) => ownedProducts.find((p) => p.id === id) ?? products.find((p) => p.id === id))
-    .filter(Boolean) as Product[];
+  const uniquePurchasedProductIds = useMemo(() => Array.from(new Set(purchases)), [purchases]);
+
+  const purchasedProducts = useMemo(() => {
+    return uniquePurchasedProductIds
+      .map((id) => ownedProducts.find((p) => p.id === id) ?? products.find((p) => p.id === id))
+      .filter(Boolean) as Product[];
+  }, [uniquePurchasedProductIds, ownedProducts, products]);
 
   const totalPurchased = purchases.length;
   const totalFollowers = purchasedProducts.reduce((sum, p) => sum + p.followers, 0);
 
-  const activeProduct = selectedProduct 
-    || (navigatedProductId ? purchasedProducts.find(p => p.id === navigatedProductId) : null)
-    || (purchasedProducts.length > 0 ? purchasedProducts[0] : null);
+  const activeProduct = useMemo(() => {
+    return selectedProduct 
+      || (navigatedProductId ? purchasedProducts.find(p => p.id === navigatedProductId) : null)
+      || (purchasedProducts.length > 0 ? purchasedProducts[0] : null);
+  }, [selectedProduct, navigatedProductId, purchasedProducts]);
+
+  const activeProductId = activeProduct?.id;
+  const userId = user?.id;
 
   // Fetch selected product credentials
   useEffect(() => {
     let active = true;
-    if (activeProduct && user) {
+    if (activeProductId && userId) {
       const fetchCreds = async () => {
         setLoadingCreds(true);
         try {
           const { data, error } = await supabase.rpc('get_purchased_asset_data', {
-            product_id_param: activeProduct.id
+            product_id_param: activeProductId
           });
 
           if (error) throw error;
@@ -92,18 +100,16 @@ export const DashboardView: React.FC = () => {
       };
       fetchCreds();
     } else {
-      Promise.resolve().then(() => {
-        if (active) setCredentials('');
-      });
+      setCredentials('');
     }
     return () => {
       active = false;
     };
-  }, [activeProduct, user]);
+  }, [activeProductId, userId]);
 
   // Fetch transaction history
   useEffect(() => {
-    if (user) {
+    if (userId) {
       const fetchTransactions = async () => {
         setLoadingTxs(true);
         try {
@@ -121,7 +127,7 @@ export const DashboardView: React.FC = () => {
       };
       fetchTransactions();
     }
-  }, [purchases, user]);
+  }, [purchases.length, userId]);
 
   const handleRaiseDispute = (productId: string) => {
     if (window.confirm("⚠️ Are you sure you want to raise a dispute for this account?\n\nThis will instantly freeze the transaction on the database and flag the credentials for admin security auditing. Our support team will contact you shortly.")) {
