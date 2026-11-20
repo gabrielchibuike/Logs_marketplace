@@ -40,10 +40,20 @@ export const DashboardView: React.FC = () => {
 
   // Auto-verify if returning from Paystack redirect (?reference=... or ?trxref=...)
   useEffect(() => {
-    if (!user) return;
     const searchParams = new URLSearchParams(location.search);
     const returnRef = searchParams.get('reference') || searchParams.get('trxref');
-    
+    const returnProdId = searchParams.get('product_id');
+    const returnQty = parseInt(searchParams.get('quantity') || '1', 10) || 1;
+
+    // Prompt login if returning from payment but unauthenticated
+    if (!user) {
+      if (returnRef) {
+        showToast('Payment received! Please sign in to reveal your credentials.', 'info');
+        setAuthModalOpen(true);
+      }
+      return;
+    }
+
     // Check pending tx in localStorage
     const pendingRaw = localStorage.getItem('nlogs_pending_tx');
     let pendingTx: any = null;
@@ -56,7 +66,8 @@ export const DashboardView: React.FC = () => {
     }
 
     const refToVerify = returnRef || (pendingTx && (Date.now() - pendingTx.timestamp < 3600000) ? pendingTx.reference : null);
-    const prodIdToVerify = pendingTx?.productId || navigatedProductId;
+    const prodIdToVerify = returnProdId || pendingTx?.productId || navigatedProductId;
+    const qtyToVerify = returnQty || pendingTx?.quantity || 1;
 
     if (refToVerify && prodIdToVerify) {
       // Clean up URL and storage immediately to avoid double-firing
@@ -65,16 +76,16 @@ export const DashboardView: React.FC = () => {
       }
       localStorage.removeItem('nlogs_pending_tx');
 
-      completePayment(prodIdToVerify, refToVerify, pendingTx?.quantity || 1).then((res) => {
+      completePayment(prodIdToVerify, refToVerify, qtyToVerify).then((res) => {
         if (res.success) {
           showToast('Payment verified! Asset unlocked successfully.', 'success');
           if (refreshProducts) refreshProducts();
         }
       });
-    } else if (returnRef && !prodIdToVerify) {
+    } else if (refToVerify && !prodIdToVerify) {
       // If reference returned from redirect but storage was lost (e.g. Safari Private Mode),
       // auto-fill the Claim modal so the buyer can pick the product and finish verification in 1 click
-      setClaimReference(returnRef);
+      setClaimReference(refToVerify);
       setClaimModalOpen(true);
       showToast('Payment reference detected! Select your account to complete unlock.', 'info');
     }
@@ -242,18 +253,42 @@ export const DashboardView: React.FC = () => {
   };
 
   if (!user) {
+    const searchParams = new URLSearchParams(location.search);
+    const hasReturnRef = searchParams.get('reference') || searchParams.get('trxref');
+
     return (
       <div className="w-full py-20 flex flex-col items-center justify-center text-center">
         <div className="bg-brand-card p-10 rounded-md border border-brand-border glass max-w-md w-full">
-          <ShieldCheck size={48} className="text-brand-red mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-brand-navy font-mono mb-2 uppercase tracking-wide">Authentication Required</h2>
-          <p className="text-sm text-brand-muted mb-6">You need to sign in to view your purchased accounts, transaction history, and secure credentials.</p>
-          <button
-            onClick={() => setAuthModalOpen(true)}
-            className="w-full py-3 bg-brand-red hover:bg-brand-red-hover text-white transition font-mono font-bold rounded-md cursor-pointer border-0"
-          >
-            Sign In to Access Dashboard
-          </button>
+          {hasReturnRef ? (
+            <>
+              <CheckCircle2 size={48} className="text-emerald-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-brand-navy font-mono mb-2 uppercase tracking-wide">Payment Confirmed!</h2>
+              <p className="text-sm text-brand-muted mb-4">
+                Reference: <code className="text-xs bg-slate-100 p-1 rounded font-mono text-brand-navy">{hasReturnRef}</code>
+              </p>
+              <p className="text-xs text-brand-muted mb-6">
+                Please sign in with the account you used to complete the purchase so your credentials can be decrypted and unlocked.
+              </p>
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white transition font-mono font-bold rounded-md cursor-pointer border-0"
+              >
+                Sign In to Reveal Credentials
+              </button>
+            </>
+          ) : (
+            <>
+              <ShieldCheck size={48} className="text-brand-red mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-brand-navy font-mono mb-2 uppercase tracking-wide">Authentication Required</h2>
+              <p className="text-sm text-brand-muted mb-6">You need to sign in to view your purchased accounts, transaction history, and secure credentials.</p>
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                className="w-full py-3 bg-brand-red hover:bg-brand-red-hover text-white transition font-mono font-bold rounded-md cursor-pointer border-0"
+              >
+                Sign In to Access Dashboard
+              </button>
+            </>
+          )}
         </div>
       </div>
     );

@@ -37,7 +37,7 @@ const getPlatformColor = (platform: string) => {
 };
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails }) => {
-  const { purchases, user, setAuthModalOpen, completePayment, showToast } = useApp();
+  const { purchases, user, setAuthModalOpen, showToast } = useApp();
   const navigate = useNavigate();
 
   const isPurchased = purchases.includes(product.id);
@@ -97,13 +97,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
           quantity: 1
         },
         callback: (response: any) => {
-          localStorage.removeItem('nlogs_pending_tx');
           const finalRef = response?.reference || generatedRef;
-          completePayment(product.id, finalRef).then((res) => {
-            if (res.success) {
-              navigate('/dashboard', { state: { selectedProductId: product.id } });
-            }
-          });
+          // Force top-level redirect to Dashboard with reference and product_id query params.
+          // This destroys the Paystack iframe, bypasses Safari iframe restrictions,
+          // and ensures the Dashboard handles credential decryption cleanly.
+          window.location.href = `/dashboard?reference=${encodeURIComponent(finalRef)}&product_id=${encodeURIComponent(product.id)}`;
         },
         onClose: () => {
           showToast('Payment window closed.', 'info');

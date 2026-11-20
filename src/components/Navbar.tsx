@@ -7,7 +7,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 declare const PaystackPop: any;
 
 export const Navbar: React.FC = () => {
-  const { cart, removeFromCart, products, user, userProfile, signOut, setAuthModalOpen, completePayment, showToast, theme, toggleTheme } = useApp();
+  const { cart, removeFromCart, products, user, userProfile, signOut, setAuthModalOpen, showToast, theme, toggleTheme } = useApp();
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -22,19 +22,38 @@ export const Navbar: React.FC = () => {
     }
 
     try {
+      const generatedRef = 'NL_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+      localStorage.setItem('nlogs_pending_tx', JSON.stringify({
+        productId: product.id,
+        quantity: 1,
+        reference: generatedRef,
+        timestamp: Date.now()
+      }));
+
       const handler = PaystackPop.setup({
         key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
         email: user.email,
         amount: Math.round(product.price * 100), // in kobo
-        callback: async (response: any) => {
-          const res = await completePayment(product.id, response.reference);
-          if (res.success) {
-            setCartOpen(false);
-            navigate('/dashboard', { state: { selectedProductId: product.id } });
-          }
+        ref: generatedRef,
+        callback_url: `${window.location.origin}/dashboard`,
+        metadata: {
+          custom_fields: [
+            { display_name: "Product ID", variable_name: "product_id", value: product.id },
+            { display_name: "User ID", variable_name: "user_id", value: user.id },
+            { display_name: "Quantity", variable_name: "quantity", value: 1 }
+          ],
+          product_id: product.id,
+          user_id: user.id,
+          quantity: 1
+        },
+        callback: (response: any) => {
+          const finalRef = response?.reference || generatedRef;
+          setCartOpen(false);
+          window.location.href = `/dashboard?reference=${encodeURIComponent(finalRef)}&product_id=${encodeURIComponent(product.id)}`;
         },
         onClose: () => {
-          showToast('Payment cancelled.', 'info');
+          showToast('Payment window closed.', 'info');
         }
       });
       handler.openIframe();

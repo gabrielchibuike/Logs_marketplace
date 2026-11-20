@@ -39,7 +39,7 @@ const formatSampleData = (data: Record<string, string> | null | undefined): stri
 };
 
 export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) => {
-  const { cart, purchases, addToCart, user, setAuthModalOpen, completePayment, showToast } = useApp();
+  const { cart, purchases, addToCart, user, setAuthModalOpen, showToast } = useApp();
   const navigate = useNavigate();
   const [decryptedCredentials, setDecryptedCredentials] = useState<string>('');
   const [loadingCredentials, setLoadingCredentials] = useState<boolean>(false);
@@ -130,14 +130,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
           quantity: buyQty
         },
         callback: (response: any) => {
-          localStorage.removeItem('nlogs_pending_tx');
           const finalRef = response?.reference || generatedRef;
-          completePayment(product.id, finalRef, buyQty).then((res) => {
-            if (res.success) {
-              onClose();
-              navigate('/dashboard', { state: { selectedProductId: product.id } });
-            }
-          });
+          // Force top-level redirect to Dashboard with reference, product_id, and quantity query params.
+          window.location.href = `/dashboard?reference=${encodeURIComponent(finalRef)}&product_id=${encodeURIComponent(product.id)}&quantity=${encodeURIComponent(buyQty)}`;
         },
         onClose: () => {
           showToast('Payment window closed.', 'info');
