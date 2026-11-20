@@ -53,9 +53,15 @@ export const DashboardView: React.FC = () => {
   const totalFollowers = purchasedProducts.reduce((sum, p) => sum + p.followers, 0);
 
   const activeProduct = useMemo(() => {
-    return selectedProduct 
-      || (navigatedProductId ? purchasedProducts.find(p => p.id === navigatedProductId) : null)
-      || (purchasedProducts.length > 0 ? purchasedProducts[0] : null);
+    if (purchasedProducts.length === 0) return null;
+    if (selectedProduct && purchasedProducts.some((p) => p.id === selectedProduct.id)) {
+      return selectedProduct;
+    }
+    if (navigatedProductId) {
+      const match = purchasedProducts.find((p) => p.id === navigatedProductId);
+      if (match) return match;
+    }
+    return purchasedProducts[0] ?? null;
   }, [selectedProduct, navigatedProductId, purchasedProducts]);
 
   const activeProductId = activeProduct?.id;

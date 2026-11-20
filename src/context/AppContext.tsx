@@ -233,10 +233,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
-      // B. Fetch purchased accounts mapping (ordered newest first)
+      // B. Fetch purchased accounts mapping for this specific user (ordered newest first)
       const { data: bought, error: boughtErr } = await supabase
         .from('purchased_accounts')
         .select('product_id')
+        .eq('buyer_id', userId)
         .order('created_at', { ascending: false });
 
       if (boughtErr) throw boughtErr;
@@ -249,38 +250,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // These go into `ownedProducts` — a SEPARATE state from the marketplace `products`
         // array — so sold items never leak into the catalog grid.
         const uniquePurchasedIds = Array.from(new Set(purchasedIds)) as string[];
-        supabase
+        const { data: ownedData, error: ownedErr } = await supabase
           .from('products')
           .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data, quantity_total, quantity_available')
-          .in('id', uniquePurchasedIds)
-          .then(({ data: ownedData }) => {
-            if (ownedData && ownedData.length > 0) {
-              const formatted = ownedData.map((item: any) => ({
-                id: item.id,
-                title: item.title,
-                description: item.description || '',
-                price: parseFloat(item.price),
-                platform: item.platform,
-                category: item.category,
-                followers: item.followers,
-                following: item.following,
-                engagement: parseFloat(item.engagement),
-                accountAgeDays: item.account_age_days,
-                posts: item.posts,
-                verified: item.verified,
-                niche: item.niche || '',
-                tags: Array.isArray(item.tags) ? item.tags : [],
-                sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
-                quantityTotal: item.quantity_total !== undefined ? item.quantity_total : 1,
-                quantityAvailable: item.quantity_available !== undefined ? item.quantity_available : 1,
-                fullDataContent: ''
-              }));
-              setOwnedProducts(formatted);
-            } else {
-              setOwnedProducts([]);
-            }
-          });
+          .in('id', uniquePurchasedIds);
+
+        if (ownedErr) {
+          console.error('Error fetching owned products details:', ownedErr);
+        }
+
+        if (ownedData && ownedData.length > 0) {
+          const formatted = ownedData.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description || '',
+            price: parseFloat(item.price),
+            platform: item.platform,
+            category: item.category,
+            followers: item.followers,
+            following: item.following,
+            engagement: parseFloat(item.engagement),
+            accountAgeDays: item.account_age_days,
+            posts: item.posts,
+            verified: item.verified,
+            niche: item.niche || '',
+            tags: Array.isArray(item.tags) ? item.tags : [],
+            sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
+            quantityTotal: item.quantity_total !== undefined ? item.quantity_total : 1,
+            quantityAvailable: item.quantity_available !== undefined ? item.quantity_available : 1,
+            fullDataContent: ''
+          }));
+          setOwnedProducts(formatted);
+        } else {
+          setOwnedProducts([]);
+        }
       } else {
+        setPurchases([]);
         setOwnedProducts([]);
       }
     } catch (err) {

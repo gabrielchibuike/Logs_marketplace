@@ -187,6 +187,17 @@ BEGIN
             SELECT jsonb_build_array(encrypted_credentials) INTO credentials_array
             FROM public.products
             WHERE id = product_id_param;
+        ELSIF public.is_admin(buyer_id_var) THEN
+            -- Allow store administrator to inspect credentials for audit/debugging
+            SELECT jsonb_agg(encrypted_credentials) INTO credentials_array
+            FROM public.product_credentials
+            WHERE product_id = product_id_param;
+
+            IF credentials_array IS NULL THEN
+                SELECT jsonb_build_array(encrypted_credentials) INTO credentials_array
+                FROM public.products
+                WHERE id = product_id_param;
+            END IF;
         ELSE
             RAISE EXCEPTION 'Access denied: You have not purchased this asset';
         END IF;
