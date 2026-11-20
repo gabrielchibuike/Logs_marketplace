@@ -54,3 +54,4 @@ BEGIN
     RETURN credentials_array;
 END;
 $$;
+
