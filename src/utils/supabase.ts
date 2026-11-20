@@ -22,27 +22,63 @@ if (missingVars.length > 0) {
   }
 }
 
-// Custom cookie storage adapter for Supabase client session tracking (XSS mitigation)
+// Dual-storage adapter for Supabase client session tracking:
+// Uses document.cookie (SameSite=Lax) + localStorage fallback.
+// This is critical for Safari (iOS & macOS) where external redirects from payment providers
+// like Paystack or 3D-Secure drop SameSite=Strict cookies upon return.
 const cookieStorage = {
   getItem: (key: string): string | null => {
-    const name = key + "=";
-    const decodedCookie = decodeURIComponent(document.cookie);
-    const ca = decodedCookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-      let c = ca[i].trim();
-      if (c.indexOf(name) === 0) {
-        return c.substring(name.length, c.length);
+    // 1. Try reading from cookie first
+    try {
+      const name = key + "=";
+      const decodedCookie = decodeURIComponent(document.cookie);
+      const ca = decodedCookie.split(';');
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i].trim();
+        if (c.indexOf(name) === 0) {
+          const val = c.substring(name.length, c.length);
+          if (val) return val;
+        }
       }
+    } catch (e) {
+      // Cookie read error fallback
     }
+
+    // 2. Fallback to localStorage (vital for Safari after payment gateway redirects)
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      // Storage access error fallback
+    }
+
     return null;
   },
   setItem: (key: string, value: string): void => {
-    const secureFlag = window.location.protocol === 'https:' ? 'Secure;' : '';
-    document.cookie = `${key}=${value}; path=/; ${secureFlag} SameSite=Strict`;
+    try {
+      const secureFlag = window.location.protocol === 'https:' ? 'Secure;' : '';
+      // SameSite=Lax is required for cross-site return redirects (Paystack, OAuth) to retain session
+      document.cookie = `${key}=${value}; path=/; ${secureFlag} SameSite=Lax`;
+    } catch (e) {}
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
+    } catch (e) {}
   },
   removeItem: (key: string): void => {
-    const secureFlag = window.location.protocol === 'https:' ? 'Secure;' : '';
-    document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; ${secureFlag} SameSite=Strict`;
+    try {
+      const secureFlag = window.location.protocol === 'https:' ? 'Secure;' : '';
+      document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; ${secureFlag} SameSite=Lax`;
+    } catch (e) {}
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch (e) {}
   }
 };
 

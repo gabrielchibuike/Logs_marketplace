@@ -85,6 +85,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
         email: user.email,
         amount: Math.round(product.price * 100), // in kobo
         ref: generatedRef,
+        callback_url: `${window.location.origin}/dashboard`,
         metadata: {
           custom_fields: [
             { display_name: "Product ID", variable_name: "product_id", value: product.id },

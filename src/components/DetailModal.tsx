@@ -118,6 +118,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ product, onClose }) =>
         email: user.email,
         amount: Math.round(product.price * buyQty * 100), // in kobo, scaled by qty
         ref: generatedRef,
+        callback_url: `${window.location.origin}/dashboard`,
         metadata: {
           custom_fields: [
             { display_name: "Product ID", variable_name: "product_id", value: product.id },

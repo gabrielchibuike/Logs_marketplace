@@ -71,6 +71,12 @@ export const DashboardView: React.FC = () => {
           if (refreshProducts) refreshProducts();
         }
       });
+    } else if (returnRef && !prodIdToVerify) {
+      // If reference returned from redirect but storage was lost (e.g. Safari Private Mode),
+      // auto-fill the Claim modal so the buyer can pick the product and finish verification in 1 click
+      setClaimReference(returnRef);
+      setClaimModalOpen(true);
+      showToast('Payment reference detected! Select your account to complete unlock.', 'info');
     }
   }, [user, location.search]);
 
