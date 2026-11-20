@@ -20,6 +20,8 @@ export const CatalogView: React.FC = () => {
 
   const filteredProducts = products
     .filter((product) => {
+      // Never show sold-out listings in the marketplace grid
+      if (product.quantityAvailable === 0) return false;
       const matchesSearch =
         product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||

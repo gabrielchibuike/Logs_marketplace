@@ -13,6 +13,9 @@ interface AppContextType {
   cart: string[];
   purchases: string[];
   products: Product[];
+  /** Products the signed-in buyer has purchased. May include sold-out items.
+   *  Use this in the Dashboard — NOT in the marketplace catalog. */
+  ownedProducts: Product[];
   loading: boolean;
   dbError: string | null;
   user: any | null;
@@ -106,6 +109,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [purchases, setPurchases] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  // Separate list for products the buyer owns — may include sold-out items.
+  // Kept apart so the marketplace catalog (products) stays clean.
+  const [ownedProducts, setOwnedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [dbError, setDbError] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
@@ -198,6 +204,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUser(null);
         setUserProfile(null);
         setPurchases([]);
+        setOwnedProducts([]);
         fetchLiveProducts();
       }
     });
@@ -237,50 +244,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const purchasedIds = bought.map((b: any) => b.product_id);
         setPurchases(purchasedIds);
 
-        // C. Ensure purchased products are in the products list even if sold/hidden by RLS.
-        // The products RLS may hide sold items — fetch them explicitly by ID so the
-        // Dashboard can display the product title, platform, etc.
+        // Fetch ALL unique purchased product IDs explicitly so the Dashboard can
+        // display them even if they are sold-out / hidden by RLS on the main products table.
+        // These go into `ownedProducts` — a SEPARATE state from the marketplace `products`
+        // array — so sold items never leak into the catalog grid.
         const uniquePurchasedIds = Array.from(new Set(purchasedIds)) as string[];
-        setProducts((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const missingIds = uniquePurchasedIds.filter((id) => !existingIds.has(id));
-          if (missingIds.length === 0) return prev;
-          // We'll kick off an async fetch for the missing ones and merge them in
-          supabase
-            .from('products')
-            .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data, quantity_total, quantity_available')
-            .in('id', missingIds)
-            .then(({ data: missing }) => {
-              if (missing && missing.length > 0) {
-                const formatted = missing.map((item: any) => ({
-                  id: item.id,
-                  title: item.title,
-                  description: item.description || '',
-                  price: parseFloat(item.price),
-                  platform: item.platform,
-                  category: item.category,
-                  followers: item.followers,
-                  following: item.following,
-                  engagement: parseFloat(item.engagement),
-                  accountAgeDays: item.account_age_days,
-                  posts: item.posts,
-                  verified: item.verified,
-                  niche: item.niche || '',
-                  tags: Array.isArray(item.tags) ? item.tags : [],
-                  sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
-                  quantityTotal: item.quantity_total !== undefined ? item.quantity_total : 1,
-                  quantityAvailable: item.quantity_available !== undefined ? item.quantity_available : 1,
-                  fullDataContent: ''
-                }));
-                setProducts((current) => {
-                  const currentIds = new Set(current.map((p) => p.id));
-                  const toAdd = formatted.filter((p: any) => !currentIds.has(p.id));
-                  return toAdd.length > 0 ? [...current, ...toAdd] : current;
-                });
-              }
-            });
-          return prev; // Return unchanged; the async fetch will update later
-        });
+        supabase
+          .from('products')
+          .select('id, title, description, price, platform, category, followers, following, engagement, account_age_days, posts, verified, niche, tags, sample_data, quantity_total, quantity_available')
+          .in('id', uniquePurchasedIds)
+          .then(({ data: ownedData }) => {
+            if (ownedData && ownedData.length > 0) {
+              const formatted = ownedData.map((item: any) => ({
+                id: item.id,
+                title: item.title,
+                description: item.description || '',
+                price: parseFloat(item.price),
+                platform: item.platform,
+                category: item.category,
+                followers: item.followers,
+                following: item.following,
+                engagement: parseFloat(item.engagement),
+                accountAgeDays: item.account_age_days,
+                posts: item.posts,
+                verified: item.verified,
+                niche: item.niche || '',
+                tags: Array.isArray(item.tags) ? item.tags : [],
+                sampleData: typeof item.sample_data === 'object' && item.sample_data !== null ? item.sample_data : {},
+                quantityTotal: item.quantity_total !== undefined ? item.quantity_total : 1,
+                quantityAvailable: item.quantity_available !== undefined ? item.quantity_available : 1,
+                fullDataContent: ''
+              }));
+              setOwnedProducts(formatted);
+            } else {
+              setOwnedProducts([]);
+            }
+          });
+      } else {
+        setOwnedProducts([]);
       }
     } catch (err) {
       console.error('Error syncing profile meta:', err);
@@ -470,6 +471,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cart,
       purchases,
       products,
+      ownedProducts,
       loading,
       dbError,
       user,

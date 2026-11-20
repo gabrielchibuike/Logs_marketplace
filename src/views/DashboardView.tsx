@@ -8,7 +8,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { decryptText } from '../utils/crypto';
 
 export const DashboardView: React.FC = () => {
-  const { purchases, products, user, setAuthModalOpen, refreshProducts } = useApp();
+  const { purchases, products, ownedProducts, user, setAuthModalOpen, refreshProducts } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const navigatedProductId = (location.state as any)?.selectedProductId;
@@ -38,10 +38,12 @@ export const DashboardView: React.FC = () => {
     }
   }, [refreshProducts, purchases.length]);
 
-  // Unique purchased products preserving order of purchase
+  // Unique purchased products preserving order of purchase.
+  // Looks up in ownedProducts first (covers sold-out items fetched for the buyer),
+  // then falls back to the main products array (covers active items just purchased).
   const uniquePurchasedProductIds = Array.from(new Set(purchases));
   const purchasedProducts = uniquePurchasedProductIds
-    .map((id) => products.find((p) => p.id === id))
+    .map((id) => ownedProducts.find((p) => p.id === id) ?? products.find((p) => p.id === id))
     .filter(Boolean) as Product[];
 
   const totalPurchased = purchases.length;
