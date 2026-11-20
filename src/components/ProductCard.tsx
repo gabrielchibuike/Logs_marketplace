@@ -69,19 +69,43 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
     }
 
     try {
+      const generatedRef = 'NL_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+      // Save pending transaction details so if Paystack redirects or the browser tab is reloaded,
+      // the purchase can still be verified and claimed automatically on the dashboard.
+      localStorage.setItem('nlogs_pending_tx', JSON.stringify({
+        productId: product.id,
+        quantity: 1,
+        reference: generatedRef,
+        timestamp: Date.now()
+      }));
+
       const handler = PaystackPop.setup({
         key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
         email: user.email,
         amount: Math.round(product.price * 100), // in kobo
+        ref: generatedRef,
+        metadata: {
+          custom_fields: [
+            { display_name: "Product ID", variable_name: "product_id", value: product.id },
+            { display_name: "User ID", variable_name: "user_id", value: user.id },
+            { display_name: "Quantity", variable_name: "quantity", value: 1 }
+          ],
+          product_id: product.id,
+          user_id: user.id,
+          quantity: 1
+        },
         callback: (response: any) => {
-          completePayment(product.id, response.reference).then((res) => {
+          localStorage.removeItem('nlogs_pending_tx');
+          const finalRef = response?.reference || generatedRef;
+          completePayment(product.id, finalRef).then((res) => {
             if (res.success) {
               navigate('/dashboard', { state: { selectedProductId: product.id } });
             }
           });
         },
         onClose: () => {
-          showToast('Payment cancelled.', 'info');
+          showToast('Payment window closed.', 'info');
         }
       });
       handler.openIframe();

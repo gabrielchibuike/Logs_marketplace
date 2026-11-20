@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Product } from '../data/products';
 import { LogTerminal } from '../components/LogTerminal';
-import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck, Settings, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Eye, Search, Key, ShieldCheck, Settings, ShieldAlert, RefreshCw, X, HelpCircle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { decryptText } from '../utils/crypto';
 
 export const DashboardView: React.FC = () => {
-  const { purchases, products, ownedProducts, user, setAuthModalOpen, refreshProducts } = useApp();
+  const { purchases, products, ownedProducts, user, setAuthModalOpen, refreshProducts, completePayment, showToast } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const navigatedProductId = (location.state as any)?.selectedProductId;
@@ -17,6 +17,13 @@ export const DashboardView: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [disputedIds, setDisputedIds] = useState<string[]>([]);
+
+  // Claim missing purchase state
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
+  const [claimReference, setClaimReference] = useState('');
+  const [claimProductId, setClaimProductId] = useState('');
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimError, setClaimError] = useState('');
 
   // Dynamic states
   const [credentials, setCredentials] = useState<string>('');
@@ -30,6 +37,42 @@ export const DashboardView: React.FC = () => {
   const [settingsError, setSettingsError] = useState('');
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsLoading, setSettingsLoading] = useState(false);
+
+  // Auto-verify if returning from Paystack redirect (?reference=... or ?trxref=...)
+  useEffect(() => {
+    if (!user) return;
+    const searchParams = new URLSearchParams(location.search);
+    const returnRef = searchParams.get('reference') || searchParams.get('trxref');
+    
+    // Check pending tx in localStorage
+    const pendingRaw = localStorage.getItem('nlogs_pending_tx');
+    let pendingTx: any = null;
+    if (pendingRaw) {
+      try {
+        pendingTx = JSON.parse(pendingRaw);
+      } catch (e) {
+        console.error('Error parsing pending transaction:', e);
+      }
+    }
+
+    const refToVerify = returnRef || (pendingTx && (Date.now() - pendingTx.timestamp < 3600000) ? pendingTx.reference : null);
+    const prodIdToVerify = pendingTx?.productId || navigatedProductId;
+
+    if (refToVerify && prodIdToVerify) {
+      // Clean up URL and storage immediately to avoid double-firing
+      if (returnRef) {
+        navigate('/dashboard', { replace: true, state: { selectedProductId: prodIdToVerify } });
+      }
+      localStorage.removeItem('nlogs_pending_tx');
+
+      completePayment(prodIdToVerify, refToVerify, pendingTx?.quantity || 1).then((res) => {
+        if (res.success) {
+          showToast('Payment verified! Asset unlocked successfully.', 'success');
+          if (refreshProducts) refreshProducts();
+        }
+      });
+    }
+  }, [user, location.search]);
 
   // Re-fetch products when Dashboard mounts or purchases change to guarantee all purchased accounts are in state
   useEffect(() => {
@@ -223,12 +266,27 @@ export const DashboardView: React.FC = () => {
             Access your purchased social media accounts. View full credentials, download account details, and track your transaction history.
           </p>
         </div>
-        <button
-          onClick={() => navigate('/marketplace')}
-          className="py-2 px-4 bg-brand-navy text-white dark:text-slate-800 hover:bg-brand-navy-light transition text-xs font-bold rounded-md font-mono cursor-pointer border-0"
-        >
-          Browse Marketplace
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setClaimError('');
+              setClaimReference('');
+              setClaimProductId(purchasedProducts[0]?.id || products[0]?.id || '');
+              setClaimModalOpen(true);
+            }}
+            className="py-2 px-3 bg-brand-bg hover:bg-brand-navy/10 border border-brand-border text-brand-navy transition text-xs font-bold rounded-md font-mono cursor-pointer flex items-center gap-1.5"
+            title="Claim an account if payment was completed but not delivered"
+          >
+            <RefreshCw size={12} className="text-brand-red" />
+            Claim Missing Purchase
+          </button>
+          <button
+            onClick={() => navigate('/marketplace')}
+            className="py-2 px-4 bg-brand-navy text-white dark:text-slate-800 hover:bg-brand-navy-light transition text-xs font-bold rounded-md font-mono cursor-pointer border-0"
+          >
+            Browse Marketplace
+          </button>
+        </div>
       </div>
 
       {/* Verify Email Alert Banner */}
@@ -602,6 +660,146 @@ export const DashboardView: React.FC = () => {
                 </button>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Claim Missing Purchase Modal */}
+      {claimModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-md border border-brand-border bg-brand-card shadow-2xl overflow-hidden flex flex-col text-left">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border bg-brand-bg">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded bg-brand-navy/5 text-brand-red">
+                  <RefreshCw size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-brand-navy uppercase tracking-wider font-mono">
+                    Claim Missing Purchase
+                  </h3>
+                  <p className="text-[10px] text-brand-muted">
+                    Instant delivery recovery for completed Paystack payments
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setClaimModalOpen(false)}
+                className="p-1.5 rounded hover:bg-brand-navy/10 text-brand-muted hover:text-brand-navy transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!claimProductId) {
+                  setClaimError('Please select the product you purchased.');
+                  return;
+                }
+                if (!claimReference.trim()) {
+                  setClaimError('Please enter your Paystack transaction reference.');
+                  return;
+                }
+                setClaimLoading(true);
+                setClaimError('');
+                try {
+                  const res = await completePayment(claimProductId, claimReference.trim());
+                  if (res.success) {
+                    setClaimModalOpen(false);
+                    setClaimReference('');
+                    showToast('🎉 Purchase claimed! Credentials unlocked.', 'success');
+                    if (refreshProducts) refreshProducts();
+                  } else {
+                    setClaimError(res.error || 'Failed to claim purchase. Please check reference.');
+                  }
+                } catch (err: any) {
+                  setClaimError(err.message || 'Verification error occurred.');
+                } finally {
+                  setClaimLoading(false);
+                }
+              }}
+              className="p-6 space-y-4"
+            >
+              <div className="p-3 rounded bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed flex items-start gap-2">
+                <HelpCircle size={15} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                <span>
+                  If you completed payment but were not redirected back to the site, paste your <strong>Paystack Reference</strong> (found in your Paystack email receipt or bank debit SMS alert) to instantly unlock your credentials.
+                </span>
+              </div>
+
+              {claimError && (
+                <div className="p-3 rounded bg-red-50 border border-red-200 text-brand-red text-xs font-mono">
+                  {claimError}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-brand-muted uppercase font-bold tracking-wider block font-sans">
+                  Account / Product Purchased
+                </label>
+                <select
+                  value={claimProductId}
+                  onChange={(e) => setClaimProductId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded bg-brand-bg border border-brand-border text-brand-navy focus:outline-none focus:border-brand-navy cursor-pointer"
+                  required
+                >
+                  <option value="">Select the account you paid for...</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.platform} — {p.title} (₦{p.price.toLocaleString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-brand-muted uppercase font-bold tracking-wider block font-sans">
+                  Paystack Payment Reference
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. T315313277684408 or NL_173211..."
+                  value={claimReference}
+                  onChange={(e) => setClaimReference(e.target.value)}
+                  disabled={claimLoading}
+                  className="w-full px-3 py-2 text-xs rounded bg-brand-bg border border-brand-border text-brand-navy font-mono focus:outline-none focus:border-brand-navy transition disabled:opacity-50"
+                  required
+                />
+                <span className="text-[10px] text-brand-muted block">
+                  Check your inbox for an email from Paystack or your bank's debit alert transaction reference.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-brand-border">
+                <button
+                  type="button"
+                  onClick={() => setClaimModalOpen(false)}
+                  disabled={claimLoading}
+                  className="px-4 py-2 rounded border border-brand-border bg-brand-bg text-brand-muted hover:text-brand-navy text-xs font-bold font-mono transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={claimLoading}
+                  className="px-4 py-2 rounded bg-brand-red hover:bg-brand-red-hover text-white text-xs font-bold font-mono transition flex items-center gap-1.5 cursor-pointer border-0 disabled:opacity-50"
+                >
+                  {claimLoading ? (
+                    <>
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span>Verify & Unlock Credentials</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
